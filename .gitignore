@@ -1,0 +1,7 @@
+node_modules/
+.npm-cache/
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+cypress.env.json
+.env
