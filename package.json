@@ -7,10 +7,12 @@
     "test": "cypress run",
     "test:headed": "cypress run --headed --browser chrome",
     "open": "cypress open",
-    "validate": "node --check cypress.config.js && node --check cypress/support/commands.js && node --check cypress/e2e/irctc-entry.cy.js"
+    "validate": "node --check cypress.config.js && node --check cypress/support/commands.js && node --check cypress/e2e/irctc-entry.cy.js && node --check cypress/utils/index.js"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.13"
   },
   "devDependencies": {
     "cypress": "^13.17.0"
   }
 }
-

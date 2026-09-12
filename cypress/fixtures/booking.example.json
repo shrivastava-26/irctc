@@ -1,0 +1,11 @@
+{
+  "TRAIN_NO": "",
+  "TRAIN_COACH": "",
+  "TRAVEL_DATE": "",
+  "SOURCE_STATION": "",
+  "BOARDING_STATION": null,
+  "DESTINATION_STATION": "",
+  "BOOKING_MODE": "GENERAL",
+  "PASSENGER_DETAILS": []
+}
+

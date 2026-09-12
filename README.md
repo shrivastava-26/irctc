@@ -28,6 +28,8 @@ The entry page also displayed a Tatkal eligibility notice. The project does not 
 
 Train search, quota selection, passenger data, and payment handoff have no verified current Cypress DOM evidence in this repository. They must be added one state at a time after the entry/authentication test succeeds in a real headed Cypress browser. The suite must stop for CAPTCHA, OTP, or payment authorization.
 
+`MIGRATION.md` explains which safe portions of the original Cypress project are included and why its CAPTCHA and payment automation are intentionally excluded.
+
 ## Run
 
 ```powershell
