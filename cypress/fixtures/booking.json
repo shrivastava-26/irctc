@@ -1,0 +1,18 @@
+{
+  "TRAIN_NO": "12951",
+  "TRAIN_NAME": "MUMBAI RAJDHANI",
+  "TRAIN_COACH": "3A",
+  "TRAVEL_DATE": "15/10/2026",
+  "SOURCE_STATION": "NDLS",
+  "BOARDING_STATION": null,
+  "DESTINATION_STATION": "MMCT",
+  "BOOKING_MODE": "GENERAL",
+  "PASSENGER_DETAILS": [
+    {
+      "name": "PRINCE SHRIVASTAVA",
+      "age": 23,
+      "gender": "Male",
+      "berth": "Lower"
+    }
+  ]
+}

@@ -1,13 +1,17 @@
 {
   "name": "irctc-cypress-automation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Evidence-driven Cypress diagnostics for the IRCTC booking flow.",
+  "description": "Evidence-driven Cypress automation for the IRCTC booking flow — stops at payment.",
   "scripts": {
-    "test": "cypress run",
-    "test:headed": "cypress run --headed --browser chrome",
+    "test": "cypress run --browser edge",
+    "test:headed": "cypress run --headed --browser edge",
+    "test:entry": "cypress run --browser edge --spec cypress/e2e/irctc-entry.cy.js",
+    "test:login": "cypress run --headed --browser edge --spec cypress/e2e/irctc-login.cy.js",
+    "test:search": "cypress run --headed --browser edge --spec cypress/e2e/irctc-train-search.cy.js",
+    "test:booking": "cypress run --headed --browser edge --spec cypress/e2e/irctc-booking-flow.cy.js",
     "open": "cypress open",
-    "validate": "node --check cypress.config.js && node --check cypress/support/commands.js && node --check cypress/e2e/irctc-entry.cy.js && node --check cypress/utils/index.js"
+    "validate": "node --check cypress.config.js && node --check cypress/support/commands.js && node --check cypress/e2e/irctc-entry.cy.js"
   },
   "dependencies": {
     "dayjs": "^1.11.13"
