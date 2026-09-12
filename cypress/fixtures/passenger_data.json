@@ -1,8 +1,7 @@
 {
   "TRAIN_NO": "12951",
-  "TRAIN_NAME": "MUMBAI RAJDHANI",
   "TRAIN_COACH": "3A",
-  "TRAVEL_DATE": "15/10/2026",
+  "TRAVEL_DATE": "20/10/2026",
   "SOURCE_STATION": "NDLS",
   "BOARDING_STATION": null,
   "DESTINATION_STATION": "MMCT",
@@ -18,8 +17,14 @@
       "FOOD": "No Food"
     }
   ],
-  "__valid_coaches": "SL | 2A | 3A | 3E | 1A | CC | EC | 2S",
-  "__valid_seats": "Lower | Middle | Upper | Side Lower | Side Upper | Window Side | No Preference",
-  "__valid_genders": "Male | Female | Transgender",
-  "__valid_food_choices": "Veg | Non Veg | No Food"
+  "__NOTES": {
+    "valid_coaches": "SL | 2A | 3A | 3E | 1A | CC | EC | 2S",
+    "valid_seats": "Lower | Middle | Upper | Side Lower | Side Upper | Window Side | No Preference",
+    "valid_genders": "Male | Female | Transgender",
+    "valid_food_choices": "Veg | Non Veg | No Food",
+    "tatkal_ac_opens": "10:00 IST (D-1)",
+    "tatkal_non_ac_opens": "11:00 IST (D-1)",
+    "date_format": "DD/MM/YYYY",
+    "booking_window": "120 days from today"
+  }
 }

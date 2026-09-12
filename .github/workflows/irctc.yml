@@ -18,11 +18,7 @@ on:
       UPI_ID:
         required: false
         type: string
-        description: "Your UPI ID (e.g. yourname@paytm) — required for automated payment"
-      TRAIN_NO:
-        required: false
-        type: string
-        description: "Override train number from fixture (optional)"
+        description: "Your UPI ID (e.g. yourname@paytm) — leave empty to stop at payment"
 
 jobs:
   IRCTC-Booking:
@@ -33,15 +29,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set timezone to IST (Kolkata)
-        run: sudo timedatectl set-timezone Asia/Kolkata
+      # Python setup for the CAPTCHA OCR server
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Mask secrets and set env vars
+      # Set IST timezone and start CAPTCHA solver + mask secrets
+      - name: Configure timezone, install CAPTCHA solver, mask secrets
         run: |
+          sudo timedatectl set-timezone Asia/Kolkata
+
+          pip install -r irctc-captcha-solver/requirements.txt
+
+          # Pre-load EasyOCR models (eliminates cold-start delay at booking time)
+          python3 irctc-captcha-solver/app.py ""
+
+          # Read inputs (workflow_dispatch) or fall back to secrets
           PASSWORD="${{ inputs.PASSWORD || secrets.IRCTC_PASSWORD }}"
           USERNAME="${{ inputs.USERNAME || secrets.IRCTC_USERNAME }}"
           UPI_ID="${{ inputs.UPI_ID || '' }}"
 
+          # Mask all secrets from logs
           echo "::add-mask::$PASSWORD"
           echo "::add-mask::$USERNAME"
           if [ -n "$UPI_ID" ]; then
@@ -52,28 +62,42 @@ jobs:
           echo "USERNAME=$USERNAME" >> $GITHUB_ENV
           echo "UPI_ID=$UPI_ID" >> $GITHUB_ENV
 
-      - name: Set up Node.js
+      # Node.js for Cypress
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Cypress and dependencies
-        run: npm install
-
-      - name: Install Chrome (for headed automation — required to bypass IRCTC WAF)
+      # Install Google Chrome — the only browser that bypasses IRCTC WAF
+      - name: Install Google Chrome
         run: |
           wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | \
+            sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -q
           sudo apt-get install -y google-chrome-stable
           google-chrome --version
 
-      - name: Set up virtual display (Xvfb — required for headed Chrome on ubuntu)
+      # Virtual display — required for headed Chrome on Ubuntu (no physical display)
+      - name: Start Xvfb virtual display
         run: |
           sudo apt-get install -y xvfb
           Xvfb :99 -screen 0 1478x1056x24 &
           echo "DISPLAY=:99" >> $GITHUB_ENV
 
+      # Install Cypress and dependencies
+      - name: Install Cypress and dependencies
+        run: npm install
+
+      # Start CAPTCHA OCR server in background
+      - name: Start CAPTCHA OCR server (localhost:5000)
+        run: |
+          python3 irctc-captcha-solver/app-server.py --host 0.0.0.0 --port 5000 &
+          # Wait for server to come up
+          timeout 60 bash -c 'until curl -sf http://localhost:5000/health; do sleep 2; done'
+          echo "[CAPTCHA SERVER] Ready."
+
+      # Run the main booking automation
       - name: Run IRCTC Booking Automation
         env:
           CYPRESS_USERNAME: ${{ env.USERNAME }}
@@ -85,16 +109,19 @@ jobs:
             --browser chrome \
             --headed \
             --spec "cypress/e2e/irctc.cy.js" \
-            --env USERNAME=$USERNAME,PASSWORD=$PASSWORD,UPI_ID="$UPI_ID"
+            --env USERNAME="$USERNAME",PASSWORD="$PASSWORD",UPI_ID="$UPI_ID",MANUAL_CAPTCHA=false
 
-      - name: Upload screenshots on failure
-        if: failure()
+      # Upload screenshots (always — useful for debugging any stage)
+      - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cypress-screenshots-${{ github.run_id }}
           path: cypress/screenshots/
           retention-days: 7
+          if-no-files-found: ignore
 
+      # Upload videos
       - name: Upload videos
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,3 +129,4 @@ jobs:
           name: cypress-videos-${{ github.run_id }}
           path: cypress/videos/
           retention-days: 7
+          if-no-files-found: ignore

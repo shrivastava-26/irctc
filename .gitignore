@@ -5,3 +5,15 @@ cypress/screenshots/
 cypress/downloads/
 cypress.env.json
 .env
+
+# EasyOCR model files (large binary files — downloaded automatically)
+EasyOCR/
+*.pth
+*.onnx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/

@@ -1,22 +1,23 @@
 {
   "name": "irctc-cypress-automation",
-  "version": "1.0.0",
-  "description": "IRCTC Ticket Booking Automation — General, Tatkal, Premium Tatkal",
+  "version": "3.0.5",
+  "description": "IRCTC Ticket Booking Automation — Tatkal, Premium Tatkal, General",
   "scripts": {
+    "start-captcha-server": "python irctc-captcha-solver/app-server.py --host 0.0.0.0 --port 5000",
+    "wait-for-captcha-server": "wait-on http://localhost:5000/health",
+    "start-irctc-booking": "cypress run --headed --browser chrome --no-exit",
+    "start-booking": "concurrently \"npm run start-captcha-server\" \"npm run wait-for-captcha-server && npm run start-irctc-booking\"",
+    "start-booking-edge": "concurrently \"npm run start-captcha-server\" \"npm run wait-for-captcha-server && cypress run --headed --browser edge --no-exit\"",
     "test": "cypress run --browser chrome --headed",
-    "test:electron": "cypress run",
     "test:edge": "cypress run --browser edge --headed",
-    "test:booking": "cypress run --browser chrome --headed --spec cypress/e2e/irctc.cy.js",
-    "test:entry": "cypress run --browser edge --headed --spec cypress/e2e/irctc-entry.cy.js",
-    "test:login": "cypress run --browser edge --headed --spec cypress/e2e/irctc-login.cy.js",
-    "open": "cypress open",
-    "validate": "node --check cypress.config.js"
+    "open": "cypress open"
   },
   "author": "Prince Shrivastava",
   "license": "ISC",
   "dependencies": {
+    "concurrently": "^9.2.4",
     "cypress": "^13.17.0",
-    "dayjs": "^1.11.13"
-  },
-  "devDependencies": {}
+    "dayjs": "^1.11.13",
+    "wait-on": "^8.0.5"
+  }
 }
