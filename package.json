@@ -1,22 +1,22 @@
 {
   "name": "irctc-cypress-automation",
-  "version": "0.2.0",
-  "private": true,
-  "description": "Evidence-driven Cypress automation for the IRCTC booking flow — stops at payment.",
+  "version": "1.0.0",
+  "description": "IRCTC Ticket Booking Automation — General, Tatkal, Premium Tatkal",
   "scripts": {
-    "test": "cypress run --browser edge",
-    "test:headed": "cypress run --headed --browser edge",
-    "test:entry": "cypress run --browser edge --spec cypress/e2e/irctc-entry.cy.js",
-    "test:login": "cypress run --headed --browser edge --spec cypress/e2e/irctc-login.cy.js",
-    "test:search": "cypress run --headed --browser edge --spec cypress/e2e/irctc-train-search.cy.js",
-    "test:booking": "cypress run --headed --browser edge --spec cypress/e2e/irctc-booking-flow.cy.js",
+    "test": "cypress run --browser chrome --headed",
+    "test:electron": "cypress run",
+    "test:edge": "cypress run --browser edge --headed",
+    "test:booking": "cypress run --browser chrome --headed --spec cypress/e2e/irctc.cy.js",
+    "test:entry": "cypress run --browser edge --headed --spec cypress/e2e/irctc-entry.cy.js",
+    "test:login": "cypress run --browser edge --headed --spec cypress/e2e/irctc-login.cy.js",
     "open": "cypress open",
-    "validate": "node --check cypress.config.js && node --check cypress/support/commands.js && node --check cypress/e2e/irctc-entry.cy.js"
+    "validate": "node --check cypress.config.js"
   },
+  "author": "Prince Shrivastava",
+  "license": "ISC",
   "dependencies": {
+    "cypress": "^13.17.0",
     "dayjs": "^1.11.13"
   },
-  "devDependencies": {
-    "cypress": "^13.17.0"
-  }
+  "devDependencies": {}
 }

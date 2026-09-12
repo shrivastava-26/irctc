@@ -1,0 +1,104 @@
+name: IRCTC Automation Booking
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      USERNAME:
+        required: true
+        type: string
+        description: "Your IRCTC Username"
+      PASSWORD:
+        required: true
+        type: string
+        description: "Your IRCTC Password"
+      UPI_ID:
+        required: false
+        type: string
+        description: "Your UPI ID (e.g. yourname@paytm) — required for automated payment"
+      TRAIN_NO:
+        required: false
+        type: string
+        description: "Override train number from fixture (optional)"
+
+jobs:
+  IRCTC-Booking:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set timezone to IST (Kolkata)
+        run: sudo timedatectl set-timezone Asia/Kolkata
+
+      - name: Mask secrets and set env vars
+        run: |
+          PASSWORD="${{ inputs.PASSWORD || secrets.IRCTC_PASSWORD }}"
+          USERNAME="${{ inputs.USERNAME || secrets.IRCTC_USERNAME }}"
+          UPI_ID="${{ inputs.UPI_ID || '' }}"
+
+          echo "::add-mask::$PASSWORD"
+          echo "::add-mask::$USERNAME"
+          if [ -n "$UPI_ID" ]; then
+            echo "::add-mask::$UPI_ID"
+          fi
+
+          echo "PASSWORD=$PASSWORD" >> $GITHUB_ENV
+          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
+          echo "UPI_ID=$UPI_ID" >> $GITHUB_ENV
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Cypress and dependencies
+        run: npm install
+
+      - name: Install Chrome (for headed automation — required to bypass IRCTC WAF)
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+          google-chrome --version
+
+      - name: Set up virtual display (Xvfb — required for headed Chrome on ubuntu)
+        run: |
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1478x1056x24 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      - name: Run IRCTC Booking Automation
+        env:
+          CYPRESS_USERNAME: ${{ env.USERNAME }}
+          CYPRESS_PASSWORD: ${{ env.PASSWORD }}
+          CYPRESS_UPI_ID: ${{ env.UPI_ID }}
+          DISPLAY: ${{ env.DISPLAY }}
+        run: |
+          npx cypress run \
+            --browser chrome \
+            --headed \
+            --spec "cypress/e2e/irctc.cy.js" \
+            --env USERNAME=$USERNAME,PASSWORD=$PASSWORD,UPI_ID="$UPI_ID"
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots-${{ github.run_id }}
+          path: cypress/screenshots/
+          retention-days: 7
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos-${{ github.run_id }}
+          path: cypress/videos/
+          retention-days: 7

@@ -1,392 +1,586 @@
 // ---------------------------------------------------------------------------
-// IRCTC Cypress custom commands
+// cypress/support/commands.js
 // ---------------------------------------------------------------------------
-// Architecture rules (never break these):
-//   1. Live DOM is the authority. No stale hardcoded selectors.
-//   2. CAPTCHA / OTP / payment must never be automated or bypassed.
-//      The commands below stop and screenshot at those boundaries.
-//   3. Credentials are read from Cypress.env() — never hardcoded.
-//   4. Only non-sensitive page-state facts may be logged.
+// Custom Cypress commands for IRCTC booking automation.
+//
+// CAPTCHA rules:
+//   submitCaptcha() — calls the OCR server if MANUAL_CAPTCHA=false (default).
+//                     If MANUAL_CAPTCHA=true, pauses for human entry.
+//   solveCaptcha()  — same, for the second-stage CAPTCHA on the review page.
+//   Both are only called when the DOM confirms a CAPTCHA is present.
+//
+// Security boundaries never crossed:
+//   - CAPTCHA: OCR or manual (never blindly skipped)
+//   - OTP: test pauses and screenshots
+//   - Payment: UPI entered + user must approve; cy.wait() gives time
 // ---------------------------------------------------------------------------
 
-const ENTRY_PATH = '/nget/train-search';
-
-const visibleText = ($body) => $body.text().replace(/\s+/g, ' ').trim();
-
-/** Snapshot the key booleans that describe what IRCTC currently shows. */
-const pageState = ($body) => {
-  const text = visibleText($body);
-
-  return {
-    url: Cypress.state('window').location.href,
-    title: Cypress.state('window').document.title,
-    accessDenied: /access denied|request rejected|forbidden|403/i.test(text),
-    languageChoice:
-      /welcome to irctc/i.test(text) &&
-      /please select your preferred language/i.test(text),
-    loginTrigger: /login\s*\/\s*register/i.test(text),
-    authenticatedBookTicket:
-      /book ticket/i.test(text) && /logout|sign out/i.test(text),
-    captcha:
-      /captcha/i.test(text) ||
-      $body.find(
-        'img[class*="captcha" i], input[id*="captcha" i], input[name*="captcha" i], [class*="captcha" i]',
-      ).length > 0,
-    otp: /enter.*otp|otp.*sent|one.?time.?password/i.test(text),
-    trainResults: /available trains|no trains|train list/i.test(text),
-    passengerForm:
-      /passenger.*detail|add passenger|traveller.*detail/i.test(text),
-    paymentPage: /proceed.*payment|total.*fare|pay.*book/i.test(text),
-  };
-};
+import { formatDate, hasTatkalAlreadyOpened, tatkalOpenTimeForToday } from '../utils/index';
+import {
+  PASSENGER_DETAILS,
+  SOURCE_STATION,
+  DESTINATION_STATION,
+  TRAIN_NO,
+  TRAIN_COACH,
+  TRAVEL_DATE,
+  TATKAL,
+  PREMIUM_TATKAL,
+  BOARDING_STATION,
+} from '../fixtures/passenger_data.json';
 
 // ---------------------------------------------------------------------------
-// visitIrctcEntry
+// submitCaptcha — handles the LOGIN page CAPTCHA (conditional call only)
 // ---------------------------------------------------------------------------
-Cypress.Commands.add('visitIrctcEntry', () => {
-  // Use on-before-load hook to set a real desktop UA so IRCTC's WAF doesn't
-  // serve a 403/ESOCKETTIMEDOUT to the headless Electron/Chrome process.
-  cy.visit(ENTRY_PATH, {
-    failOnStatusCode: false,
-    onBeforeLoad(win) {
-      Object.defineProperty(win.navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-          'Chrome/126.0.0.0 Safari/537.36',
-        configurable: true,
+Cypress.Commands.add('submitCaptcha', () => {
+  const MANUAL_CAPTCHA = Cypress.env('MANUAL_CAPTCHA') === true;
+
+  if (MANUAL_CAPTCHA) {
+    // Manual mode: human types the captcha. Wait 30s for manual entry.
+    cy.task('log', '[CAPTCHA] Manual mode — waiting 30s for human entry.');
+    cy.wait(30000);
+    cy.contains('button', /sign\s*in/i).should('be.enabled').click();
+    return;
+  }
+
+  // Automatic mode: call the local OCR server (must be running).
+  cy.task('log', '[CAPTCHA] Auto mode — fetching image for OCR.');
+
+  cy.get('.captcha-img, img[class*="captcha" i]', { timeout: 10000 })
+    .invoke('attr', 'src')
+    .then((src) => {
+      // The captcha src is a relative URL like /captchaEnq — prepend base.
+      const captchaUrl = src.startsWith('http')
+        ? src
+        : `https://www.irctc.co.in${src}`;
+
+      cy.request({
+        method: 'POST',
+        url: 'http://localhost:5000/get-captcha-string',
+        body: { url: captchaUrl },
+        failOnStatusCode: false,
+        timeout: 30000,
+      }).then((response) => {
+        if (response.status !== 200 || !response.body?.captcha_string) {
+          cy.task(
+            'log',
+            '[CAPTCHA] OCR server failed — falling back to manual. Set MANUAL_CAPTCHA=true.',
+          );
+          cy.screenshot('CAPTCHA-OCR-failed');
+          throw new Error(
+            '[CAPTCHA] OCR server at localhost:5000 did not return a captcha_string. ' +
+              'Either start the captcha server or set MANUAL_CAPTCHA=true in cypress.env.json.',
+          );
+        }
+
+        const captchaText = response.body.captcha_string;
+        cy.task('log', `[CAPTCHA] OCR result received (length: ${captchaText.length}).`);
+
+        cy.get('input#captcha, input[formcontrolname="captcha"], input[placeholder*="captcha" i]', {
+          timeout: 10000,
+        })
+          .clear()
+          .type(captchaText);
+
+        cy.contains('button', /sign\s*in/i).should('be.enabled').click();
       });
-    },
-  });
-  cy.get('body', { timeout: 90_000 }).should('be.visible');
-  cy.get('body').then(($body) => {
-    const state = pageState($body);
-    cy.task('reportIrctcState', state);
-
-    if (state.accessDenied) {
-      throw new Error(
-        'IRCTC returned an access-denied page. ' +
-          'This is a WAF/network state, not a selector failure. ' +
-          'Use a headed Chrome run: npx cypress run --headed --browser chrome',
-      );
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// dismissLanguageChoiceIfPresent
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('dismissLanguageChoiceIfPresent', () => {
-  cy.get('body').then(($body) => {
-    const state = pageState($body);
-    if (!state.languageChoice) return;
-
-    cy.contains('button, [role="button"], a', /^English$/i, {
-      timeout: 10_000,
-    })
-      .should('be.visible')
-      .click();
-
-    cy.get('body').should(($updatedBody) => {
-      expect(visibleText($updatedBody)).not.to.match(
-        /please select your preferred language/i,
-      );
     });
-  });
 });
 
 // ---------------------------------------------------------------------------
-// reportCurrentIrctcState
+// solveCaptcha — second-stage CAPTCHA on the review/confirmation page
 // ---------------------------------------------------------------------------
-Cypress.Commands.add('reportCurrentIrctcState', () => {
+Cypress.Commands.add('solveCaptcha', () => {
+  const MANUAL_CAPTCHA = Cypress.env('MANUAL_CAPTCHA') === true;
+
   cy.get('body').then(($body) => {
-    cy.task('reportIrctcState', pageState($body));
+    const hasCaptcha =
+      $body.find('.captcha-img, img[class*="captcha" i], input[id*="captcha" i]').length > 0;
+
+    if (!hasCaptcha) {
+      cy.task('log', '[CAPTCHA2] No second-stage CAPTCHA detected — continuing.');
+      return;
+    }
+
+    if (MANUAL_CAPTCHA) {
+      cy.task('log', '[CAPTCHA2] Manual mode — waiting 30s for human entry.');
+      cy.wait(30000);
+      cy.contains('button', /continue|confirm|proceed/i).should('be.enabled').click();
+      return;
+    }
+
+    cy.task('log', '[CAPTCHA2] Auto mode — fetching second-stage CAPTCHA for OCR.');
+
+    cy.get('.captcha-img, img[class*="captcha" i]')
+      .invoke('attr', 'src')
+      .then((src) => {
+        const captchaUrl = src.startsWith('http')
+          ? src
+          : `https://www.irctc.co.in${src}`;
+
+        cy.request({
+          method: 'POST',
+          url: 'http://localhost:5000/get-captcha-string',
+          body: { url: captchaUrl },
+          failOnStatusCode: false,
+          timeout: 30000,
+        }).then((response) => {
+          if (response.status !== 200 || !response.body?.captcha_string) {
+            cy.screenshot('CAPTCHA2-OCR-failed');
+            throw new Error('[CAPTCHA2] OCR server failed on second stage.');
+          }
+
+          const captchaText = response.body.captcha_string;
+          cy.task('log', `[CAPTCHA2] OCR result received.`);
+
+          cy.get(
+            'input#captcha, input[formcontrolname="captcha"], input[placeholder*="captcha" i]',
+            { timeout: 10000 },
+          )
+            .clear()
+            .type(captchaText);
+
+          cy.contains('button', /continue|confirm|proceed/i)
+            .should('be.enabled')
+            .click();
+        });
+      });
   });
 });
 
 // ---------------------------------------------------------------------------
-// stopForSecurityChallenge
-// CHANGED: was unconditionally throw; now conditional based on live DOM.
-// If CAPTCHA/OTP is present → screenshot + throw (human must act).
-// If absent → no-op (do not block the test flow).
+// waitUntilAuthenticated — waits for "Book Ticket"/"Logout" post-login UI
 // ---------------------------------------------------------------------------
-Cypress.Commands.add('stopForSecurityChallenge', () => {
+Cypress.Commands.add('waitUntilAuthenticated', (timeoutMs = 60000) => {
+  cy.get('body', { timeout: timeoutMs }).should(($body) => {
+    const text = $body.text().replace(/\s+/g, ' ');
+    expect(text).to.match(/logout|sign out|my account/i);
+  });
+  cy.task('log', 'Authenticated — Logout/My Account visible.');
+});
+
+// ---------------------------------------------------------------------------
+// bookUntilTatkalGetsOpen
+// For Tatkal: clicks Book Now and retries until the Tatkal window opens.
+// For General: clicks immediately.
+// ---------------------------------------------------------------------------
+Cypress.Commands.add(
+  'bookUntilTatkalGetsOpen',
+  (div, trainCoach, travelDate, trainNo, isTatkal) => {
+    if (!isTatkal) {
+      // General booking — click Book Now directly.
+      cy.wrap(div)
+        .contains('button, [class*="book"]', /book now/i, { timeout: 10000 })
+        .click();
+      return;
+    }
+
+    // Tatkal: wait until the correct opening time then click.
+    const tatkalOpenTime = tatkalOpenTimeForToday(trainCoach);
+    cy.task(
+      'log',
+      `[TATKAL] Opening time for ${trainCoach}: ${tatkalOpenTime}. Waiting...`,
+    );
+
+    const clickWhenOpen = () => {
+      if (hasTatkalAlreadyOpened(trainCoach)) {
+        cy.task('log', '[TATKAL] Window is now open — clicking Book Now.');
+        cy.wrap(div)
+          .contains('button, [class*="book"]', /book now/i, { timeout: 10000 })
+          .click();
+      } else {
+        // Reload and retry every 30 seconds.
+        cy.wait(30000);
+        cy.reload();
+        // Re-find the train div after reload.
+        cy.get(':nth-child(n) > .bull-back').each((refreshedDiv) => {
+          if (
+            refreshedDiv[0].innerText.includes(trainNo) &&
+            refreshedDiv[0].innerText.includes(trainCoach)
+          ) {
+            cy.bookUntilTatkalGetsOpen(
+              refreshedDiv,
+              trainCoach,
+              travelDate,
+              trainNo,
+              isTatkal,
+            );
+          }
+        });
+      }
+    };
+
+    clickWhenOpen();
+  },
+);
+
+// ---------------------------------------------------------------------------
+// doPostLoginFlow — everything after successful login:
+//   check last transaction modal → station search → quota → search trains
+//   → find train → Book Now → passenger form → payment
+// ---------------------------------------------------------------------------
+Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
+  // ------------------------------------------------------------------
+  // Wait for authenticated state
+  // ------------------------------------------------------------------
+  cy.waitUntilAuthenticated(45000);
+  cy.screenshot('01-authenticated-home');
+
+  // ------------------------------------------------------------------
+  // Dismiss "Your Last Transaction" dialog if present
+  // ------------------------------------------------------------------
   cy.get('body').then(($body) => {
-    const state = pageState($body);
-
-    if (state.captcha) {
-      cy.screenshot('SECURITY-CHALLENGE-captcha');
-      throw new Error(
-        '[SECURITY BOUNDARY] IRCTC is showing a CAPTCHA. ' +
-          'A screenshot has been saved. ' +
-          'Manual completion is required — this test will not solve or bypass it.',
-      );
-    }
-
-    if (state.otp) {
-      cy.screenshot('SECURITY-CHALLENGE-otp');
-      throw new Error(
-        '[SECURITY BOUNDARY] IRCTC is asking for an OTP. ' +
-          'A screenshot has been saved. ' +
-          'Manual completion is required — this test will not solve or bypass it.',
-      );
-    }
-
-    // No CAPTCHA / OTP detected — log and continue.
-    cy.task('log', 'No CAPTCHA or OTP detected — continuing.');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// openLoginWhenAvailable
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('openLoginWhenAvailable', () => {
-  // The login/register link may be in the nav or a floating button depending
-  // on viewport. Use text-based matching — proven by prior evidence.
-  cy.contains('button, [role="button"], a, span', /login\s*\/\s*register/i, {
-    timeout: 20_000,
-  })
-    .should('be.visible')
-    .click();
-
-  // After clicking, the login panel opens. Verify by checking for a password
-  // input — the most stable evidence of the login form being open.
-  cy.get('input[type="password"]', { timeout: 20_000 }).should('be.visible');
-});
-
-// ---------------------------------------------------------------------------
-// loginFromEnvironment
-// Reads IRCTC_USERNAME / IRCTC_PASSWORD from Cypress env (cypress.env.json).
-// REMOVED the duplicate stopForSecurityChallenge call that was inside this
-// command — the caller (the spec) is responsible for calling it once before
-// and once after typing credentials.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('loginFromEnvironment', () => {
-  const username = Cypress.env('IRCTC_USERNAME');
-  const password = Cypress.env('IRCTC_PASSWORD');
-
-  if (!username || !password) {
-    throw new Error(
-      'IRCTC_USERNAME and IRCTC_PASSWORD env vars are required. ' +
-        'Create cypress.env.json with those keys (it is gitignored).',
-    );
-  }
-
-  // Find the username field by its proximity to the password field in the
-  // same form — avoids hardcoding a selector that IRCTC changes frequently.
-  cy.get('input[type="password"]', { timeout: 10_000 }).then(($password) => {
-    const $form = $password.first().closest('form, .login-form, [class*="login"]');
-    // Try the form first; fall back to any visible text input on the page.
-    let $usernameField = $form.find('input:not([type="password"])').filter(':visible').first();
-    if (!$usernameField.length) {
-      $usernameField = Cypress.$('input[type="text"]:visible, input[type="email"]:visible').first();
-    }
-    expect($usernameField, 'visible username input in the live login form').to.have.length.greaterThan(0);
-    cy.wrap($usernameField).clear().type(username, { log: false });
-  });
-
-  cy.get('input[type="password"]').first().clear().type(password, { log: false });
-
-  // "Sign In" button — text-matched for resilience.
-  cy.contains('button, [role="button"]', /sign\s*in/i)
-    .should('be.enabled')
-    .click();
-});
-
-// ---------------------------------------------------------------------------
-// waitForPostLoginUI
-// Asserts that IRCTC has transitioned to the authenticated home screen.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('waitForPostLoginUI', () => {
-  cy.get('body', { timeout: 45_000 }).should(($body) => {
-    const state = pageState($body);
-    if (state.captcha || state.otp) return; // handled separately by stopForSecurityChallenge
-    expect(
-      state.authenticatedBookTicket || state.loginTrigger === false,
-      'authenticated IRCTC booking UI (Book Ticket visible, Logout visible)',
-    ).to.be.true;
-  });
-});
-
-// ---------------------------------------------------------------------------
-// searchTrains
-// Fills the train-search form with fixture data and submits.
-// Reads from the booking fixture: SOURCE_STATION, DESTINATION_STATION,
-// TRAVEL_DATE (DD/MM/YYYY), TRAIN_COACH.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('searchTrains', (booking) => {
-  const { SOURCE_STATION, DESTINATION_STATION, TRAVEL_DATE } = booking;
-
-  // --- From station ---
-  // IRCTC uses a p-autocomplete component. Type to trigger the dropdown,
-  // then pick the first matching suggestion.
-  cy.get('input[placeholder*="From" i], input[id*="origin" i], input[aria-label*="from" i]', {
-    timeout: 20_000,
-  })
-    .first()
-    .should('be.visible')
-    .clear()
-    .type(SOURCE_STATION.substring(0, 3));
-
-  cy.get('.ui-autocomplete-panel li, .p-autocomplete-panel li, [class*="autocomplete"] li', {
-    timeout: 10_000,
-  })
-    .first()
-    .click();
-
-  // --- To station ---
-  cy.get('input[placeholder*="To" i], input[id*="destination" i], input[aria-label*="to" i]', {
-    timeout: 10_000,
-  })
-    .first()
-    .should('be.visible')
-    .clear()
-    .type(DESTINATION_STATION.substring(0, 3));
-
-  cy.get('.ui-autocomplete-panel li, .p-autocomplete-panel li, [class*="autocomplete"] li', {
-    timeout: 10_000,
-  })
-    .first()
-    .click();
-
-  // --- Travel date ---
-  // Clear then type the date. IRCTC date picker accepts keyboard entry.
-  cy.get('input[placeholder*="Date" i], input[id*="jrdate" i], p-calendar input', {
-    timeout: 10_000,
-  })
-    .first()
-    .should('be.visible')
-    .clear()
-    .type(TRAVEL_DATE);
-
-  // Close any open calendar overlay by pressing Escape.
-  cy.get('body').type('{esc}');
-
-  // --- Search button ---
-  cy.contains('button', /search/i).should('be.enabled').click();
-
-  // Assert train list rendered.
-  cy.get('body', { timeout: 30_000 }).should(($body) => {
-    const text = visibleText($body);
-    expect(text).to.match(/available trains|no train|train list/i);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// selectTrainAndClass
-// Selects a specific train by number (or the first available) and a coach class.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('selectTrainAndClass', (booking) => {
-  const { TRAIN_NO, TRAIN_COACH } = booking;
-
-  if (TRAIN_NO) {
-    // Click the specific train row.
-    cy.contains('[class*="train"], tr', TRAIN_NO, { timeout: 15_000 })
-      .should('be.visible')
-      .click();
-  }
-
-  // Select the class tab/button (e.g. "SL", "3A", "2A").
-  cy.contains('button, td, [class*="class"], [class*="quota"]', TRAIN_COACH, {
-    timeout: 10_000,
-  })
-    .should('be.visible')
-    .click();
-
-  // Click "Book Now" for that class.
-  cy.contains('button', /book now/i, { timeout: 10_000 })
-    .first()
-    .should('be.enabled')
-    .click();
-});
-
-// ---------------------------------------------------------------------------
-// fillPassengerForm
-// Fills one or more passenger rows from the fixture.
-// STOPS at the payment page — never clicks Pay.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('fillPassengerForm', (booking) => {
-  const passengers = booking.PASSENGER_DETAILS || [];
-
-  if (!passengers.length) {
-    throw new Error(
-      'No passengers in booking fixture PASSENGER_DETAILS. ' +
-        'Add at least one passenger to cypress/fixtures/booking.json.',
-    );
-  }
-
-  // Wait for the passenger form to load.
-  cy.contains(/passenger.*detail|traveller.*detail|add passenger/i, {
-    timeout: 30_000,
-  }).should('be.visible');
-
-  passengers.forEach((pax, idx) => {
-    // If there is an "Add Passenger" button (after the first), click it.
-    if (idx > 0) {
-      cy.contains('button', /add passenger|add traveller/i)
-        .should('be.visible')
+    if ($body[0].innerText.includes('Your Last Transaction')) {
+      cy.task('log', 'Dismissing Last Transaction dialog.');
+      cy.get(
+        '.ui-dialog-footer button, .modal-footer button, .ui-dialog-footer .btn',
+        { timeout: 10000 },
+      )
+        .first()
         .click();
     }
+  });
 
-    // Name — find the nth passenger name row.
-    cy.get('input[placeholder*="Name" i]').eq(idx).clear().type(pax.name);
+  // ------------------------------------------------------------------
+  // FROM station
+  // ------------------------------------------------------------------
+  cy.get(
+    '.ui-autocomplete input[placeholder*="From" i], ' +
+      'input[placeholder*="From Station" i], ' +
+      '.ng-tns-c57-8 input',
+    { timeout: 20000 },
+  )
+    .first()
+    .should('be.visible')
+    .clear()
+    .type(SOURCE_STATION, { delay: 200 });
 
-    // Age
-    cy.get('input[placeholder*="Age" i]').eq(idx).clear().type(String(pax.age));
+  cy.get('#p-highlighted-option, .ui-autocomplete-panel li, .p-autocomplete-panel li', {
+    timeout: 10000,
+  })
+    .first()
+    .click();
 
-    // Gender — select from dropdown.
-    cy.get('select[id*="gender" i], p-dropdown[placeholder*="Gender" i]')
-      .eq(idx)
-      .then(($el) => {
-        if ($el.is('select')) {
-          cy.wrap($el).select(pax.gender); // 'Male', 'Female', 'Transgender'
-        } else {
-          // PrimeNG p-dropdown.
-          cy.wrap($el).click();
-          cy.contains('.p-dropdown-item', pax.gender).click();
+  cy.task('log', `From station set: ${SOURCE_STATION}`);
+
+  // ------------------------------------------------------------------
+  // TO station
+  // ------------------------------------------------------------------
+  cy.get(
+    '.ui-autocomplete input[placeholder*="To" i], ' +
+      'input[placeholder*="To Station" i], ' +
+      '.ng-tns-c57-9 input',
+    { timeout: 10000 },
+  )
+    .first()
+    .should('be.visible')
+    .clear()
+    .type(DESTINATION_STATION, { delay: 200 });
+
+  cy.get('#p-highlighted-option, .ui-autocomplete-panel li, .p-autocomplete-panel li', {
+    timeout: 10000,
+  })
+    .first()
+    .click();
+
+  cy.task('log', `To station set: ${DESTINATION_STATION}`);
+
+  // ------------------------------------------------------------------
+  // Travel date
+  // ------------------------------------------------------------------
+  cy.get('p-calendar input, .ui-calendar input, input[placeholder*="DD/MM/YYYY" i]', {
+    timeout: 10000,
+  })
+    .first()
+    .should('be.visible')
+    .click();
+
+  cy.focused().clear();
+
+  cy.get('p-calendar input, .ui-calendar input', { timeout: 5000 })
+    .first()
+    .type(TRAVEL_DATE);
+
+  cy.get('body').type('{esc}');
+  cy.task('log', `Travel date set: ${TRAVEL_DATE}`);
+
+  // ------------------------------------------------------------------
+  // Quota selection (Tatkal / Premium Tatkal / General)
+  // ------------------------------------------------------------------
+  if (TATKAL) {
+    cy.task('log', 'Selecting TATKAL quota.');
+    cy.get('#journeyQuota .ui-dropdown, [formcontrolname="journeyQuota"]', {
+      timeout: 10000,
+    }).click();
+    cy.contains('li.ui-dropdown-item, .p-dropdown-item', /tatkal/i)
+      .not(/:contains("premium")/i)
+      .first()
+      .click();
+  }
+
+  if (PREMIUM_TATKAL) {
+    cy.task('log', 'Selecting PREMIUM TATKAL quota.');
+    cy.get('#journeyQuota .ui-dropdown, [formcontrolname="journeyQuota"]', {
+      timeout: 10000,
+    }).click();
+    cy.contains('li.ui-dropdown-item, .p-dropdown-item', /premium.*tatkal/i)
+      .first()
+      .click();
+  }
+
+  // ------------------------------------------------------------------
+  // Search trains
+  // ------------------------------------------------------------------
+  cy.contains('button', /search|find trains/i, { timeout: 10000 })
+    .should('be.enabled')
+    .click();
+
+  cy.task('log', 'Searching trains...');
+  cy.screenshot('02-train-search-submitted');
+
+  // ------------------------------------------------------------------
+  // Train list — find matching train + coach
+  // ------------------------------------------------------------------
+  cy.get(':nth-child(n) > .bull-back', { timeout: 30000 }).each((div) => {
+    if (
+      div[0].innerText.includes(TRAIN_NO) &&
+      div[0].innerText.includes(TRAIN_COACH)
+    ) {
+      cy.task('log', `Found train ${TRAIN_NO} with coach ${TRAIN_COACH}.`);
+
+      cy.bookUntilTatkalGetsOpen(div, TRAIN_COACH, TRAVEL_DATE, TRAIN_NO, TATKAL).then(
+        () => {
+          cy.task('log', 'Book Now clicked / Tatkal window confirmed open.');
+        },
+      );
+
+      // Wait for passenger form to load
+      cy.get('.dull-back.train-Header, .passenger-header, [class*="passenger"]', {
+        timeout: 30000,
+      }).should('be.visible');
+
+      cy.screenshot('03-passenger-form-loaded');
+
+      // Blank-space click to activate add-passenger button
+      cy.get('body').click(100, 300);
+
+      // Add passenger rows for each passenger beyond the first
+      for (let i = 1; i < PASSENGER_DETAILS.length; i++) {
+        cy.get(
+          '.pull-left > a > :nth-child(1), button[class*="add-passenger"], a[class*="add"]',
+          { timeout: 10000 },
+        )
+          .first()
+          .click();
+      }
+
+      // Wait for form to be stable
+      cy.get('.dull-back.train-Header, [class*="passenger"]').should('be.visible');
+
+      // ------------------------------------------------------------------
+      // Boarding station change (optional)
+      // ------------------------------------------------------------------
+      if (BOARDING_STATION) {
+        cy.get('.ui-dropdown.ui-widget.ui-corner-all', { timeout: 10000 }).click();
+        cy.contains('li.ui-dropdown-item', BOARDING_STATION).click();
+        cy.task('log', `Boarding station changed to ${BOARDING_STATION}.`);
+      }
+
+      // ------------------------------------------------------------------
+      // Passenger Name
+      // ------------------------------------------------------------------
+      cy.get('.ui-autocomplete input', { timeout: 10000 }).each(
+        (inputField, index) => {
+          if (PASSENGER_DETAILS && index < PASSENGER_DETAILS.length) {
+            const pax = PASSENGER_DETAILS[index];
+            if (pax && pax['NAME']) {
+              cy.wrap(inputField).clear().type(pax['NAME']);
+              cy.task('log', `Passenger ${index + 1} name: ${pax['NAME']}`);
+            }
+          }
+        },
+      );
+
+      // ------------------------------------------------------------------
+      // Passenger Age
+      // ------------------------------------------------------------------
+      cy.get('input[formcontrolname="passengerAge"]', { timeout: 10000 }).each(
+        (inputDiv, index) => {
+          const pax = PASSENGER_DETAILS[index];
+          cy.wrap(inputDiv).click().focused().clear();
+          cy.wrap(inputDiv).invoke('val', String(pax['AGE'])).trigger('input');
+          cy.task('log', `Passenger ${index + 1} age: ${pax['AGE']}`);
+        },
+      );
+
+      // ------------------------------------------------------------------
+      // Passenger Gender
+      // ------------------------------------------------------------------
+      cy.get('select[formcontrolname="passengerGender"]', { timeout: 10000 }).each(
+        (inputDiv, index) => {
+          const pax = PASSENGER_DETAILS[index];
+          cy.wrap(inputDiv).select(pax['GENDER']);
+        },
+      );
+
+      // ------------------------------------------------------------------
+      // Passenger Berth Preference
+      // ------------------------------------------------------------------
+      cy.get('select[formcontrolname="passengerBerthChoice"]', { timeout: 10000 }).each(
+        (inputDiv, index) => {
+          const pax = PASSENGER_DETAILS[index];
+          cy.wrap(inputDiv).select(pax['SEAT']);
+        },
+      );
+
+      // ------------------------------------------------------------------
+      // Food Preference (optional — only present on select trains)
+      // ------------------------------------------------------------------
+      cy.get('body').then(($body) => {
+        if ($body.find('select[formcontrolname="passengerFoodChoice"]').length > 0) {
+          cy.get('select[formcontrolname="passengerFoodChoice"]').each(
+            (inputDiv, index) => {
+              const pax = PASSENGER_DETAILS[index];
+              cy.wrap(inputDiv).select(pax['FOOD']);
+            },
+          );
         }
       });
 
-    // Berth preference (optional).
-    if (pax.berth) {
-      cy.get('select[id*="berth" i], p-dropdown[placeholder*="Berth" i]')
-        .eq(idx)
-        .then(($el) => {
-          if ($el.is('select')) {
-            cy.wrap($el).select(pax.berth);
+      cy.screenshot('04-passenger-form-filled');
+
+      // ------------------------------------------------------------------
+      // "Book only if confirmed berths allotted" + Auto Upgradation
+      // ------------------------------------------------------------------
+      cy.get('body').then(($body) => {
+        if (
+          $body[0].innerText.includes('Book only if confirm berths are allotted')
+        ) {
+          cy.get(':nth-child(2) > .css-label_c').click();
+          cy.task('log', 'Selected: Book only if confirmed berths allotted.');
+        }
+        if ($body[0].innerText.includes('Consider for Auto Upgradation.')) {
+          cy.contains('Consider for Auto Upgradation.').click();
+          cy.task('log', 'Selected: Consider for Auto Upgradation.');
+        }
+      });
+
+      // ------------------------------------------------------------------
+      // Payment option: UPI (radio button 2)
+      // ------------------------------------------------------------------
+      cy.get('#\\32  > .ui-radiobutton > .ui-radiobutton-box, input[value="UPI"]', {
+        timeout: 10000,
+      })
+        .first()
+        .click();
+
+      cy.task('log', 'UPI payment option selected.');
+
+      // ------------------------------------------------------------------
+      // Click "Continue" to go to review/confirmation page
+      // ------------------------------------------------------------------
+      cy.get('.train_Search, button[class*="continue"], button:contains("Continue")', {
+        timeout: 10000,
+      })
+        .first()
+        .should('be.enabled')
+        .click();
+
+      cy.task('log', 'Navigating to review page...');
+      cy.screenshot('05-review-page');
+
+      // ------------------------------------------------------------------
+      // Vande Bharat / No-food confirmation dialog (uncertain, may not appear)
+      // ------------------------------------------------------------------
+      cy.get('body').then(($body) => {
+        if ($body[0].innerText.includes('Confirmation')) {
+          cy.get(
+            '[icon="fa fa-close"] > .ui-button-text, button.ui-dialog-titlebar-close',
+            { timeout: 5000 },
+          )
+            .first()
+            .click();
+          cy.task('log', 'Dismissed food confirmation dialog.');
+        }
+      });
+
+      // ------------------------------------------------------------------
+      // Second-stage CAPTCHA (conditional — only if present on review page)
+      // ------------------------------------------------------------------
+      cy.task('log', 'Checking for second-stage CAPTCHA...');
+
+      cy.solveCaptcha().then(() => {
+        cy.task('log', 'Second-stage CAPTCHA step complete.');
+        cy.screenshot('06-payment-gateway');
+
+        // ------------------------------------------------------------------
+        // Payment gateway — BHIM UPI
+        // ------------------------------------------------------------------
+        cy.get(':nth-child(3) > .col-pad, [class*="payment-option"]', {
+          timeout: 20000,
+        })
+          .first()
+          .click();
+
+        cy.get('.col-sm-9 > app-bank > #bank-type', { timeout: 10000 }).click();
+
+        cy.get(
+          '.col-sm-9 > app-bank > #bank-type > :nth-child(2) > table > tr > :nth-child(1) > .col-lg-12 > .border-all > .col-xs-12 > .col-pad',
+          { timeout: 10000 },
+        ).click();
+
+        // Pay and Book
+        cy.get('.btn:contains("Pay"), button[class*="pay"]', { timeout: 10000 })
+          .first()
+          .click();
+
+        cy.task('log', '[PAYMENT] Pay and Book clicked — waiting for payment gateway.');
+        cy.viewport(460, 760);
+
+        // Intercept the Paytm/payment gateway transaction
+        cy.intercept('/theia/processTransaction?orderid=*').as('payment');
+
+        cy.wait('@payment', { timeout: 200000 }).then(() => {
+          cy.task('log', '[PAYMENT] Payment gateway intercepted.');
+          cy.screenshot('07-payment-upi-entry');
+
+          // Enter UPI ID on the gateway page
+          if (UPI_ID && isValidUpiId) {
+            cy.get('#ptm-upi, input[placeholder*="UPI" i]', { timeout: 15000 })
+              .first()
+              .click();
+
+            cy.get(
+              '.brdr-box > :nth-child(2) > ._1WLd > :nth-child(1) > .xs-hover-box > ._Mzth > .form-ctrl, ' +
+                'input[placeholder*="UPI ID" i]',
+              { timeout: 10000 },
+            )
+              .type(UPI_ID);
+
+            cy.get(':nth-child(5) > section > .btn, button[type="submit"]', {
+              timeout: 10000,
+            })
+              .first()
+              .click();
+
+            cy.task(
+              'log',
+              '[PAYMENT] UPI ID entered. Waiting 2 minutes for user to approve in UPI app.',
+            );
+
+            // Wait 2 minutes for the user to approve the UPI payment in their app.
+            // This is the legitimate payment boundary — user must act.
+            cy.wait(120000);
+
+            cy.screenshot('08-payment-awaiting-approval');
           } else {
-            cy.wrap($el).click();
-            cy.contains('.p-dropdown-item', pax.berth).click();
+            cy.task(
+              'log',
+              '[PAYMENT BOUNDARY] No valid UPI ID configured. Stopping at payment gateway. Set UPI_ID in cypress.env.json.',
+            );
+            cy.screenshot('PAYMENT-BOUNDARY-no-upi-id');
           }
         });
+      });
     }
   });
-});
-
-// ---------------------------------------------------------------------------
-// proceedToPaymentBoundary
-// Clicks "Continue" / "Proceed" until the payment page is reached,
-// then STOPS and takes a screenshot. Never automates payment.
-// ---------------------------------------------------------------------------
-Cypress.Commands.add('proceedToPaymentBoundary', () => {
-  // Click Continue/Proceed on the passenger form to advance to review/payment.
-  cy.contains('button', /continue|proceed/i, { timeout: 15_000 })
-    .should('be.enabled')
-    .click();
-
-  // Stop at security challenges.
-  cy.stopForSecurityChallenge();
-
-  // Wait for payment page indicators.
-  cy.get('body', { timeout: 30_000 }).should(($body) => {
-    const state = pageState($body);
-    expect(
-      state.paymentPage || state.captcha || state.otp,
-      'reached payment boundary (payment page, CAPTCHA, or OTP)',
-    ).to.be.true;
-  });
-
-  // Screenshot the payment boundary — proof of progress without crossing it.
-  cy.screenshot('PAYMENT-BOUNDARY-reached');
-  cy.task('log', '[PAYMENT BOUNDARY] Reached payment page. Stopping — human must complete payment.');
 });

@@ -1,0 +1,25 @@
+{
+  "TRAIN_NO": "12951",
+  "TRAIN_NAME": "MUMBAI RAJDHANI",
+  "TRAIN_COACH": "3A",
+  "TRAVEL_DATE": "15/10/2026",
+  "SOURCE_STATION": "NDLS",
+  "BOARDING_STATION": null,
+  "DESTINATION_STATION": "MMCT",
+  "TATKAL": false,
+  "PREMIUM_TATKAL": false,
+  "UPI_ID_CONFIG": "",
+  "PASSENGER_DETAILS": [
+    {
+      "NAME": "PRINCE SHRIVASTAVA",
+      "AGE": 23,
+      "GENDER": "Male",
+      "SEAT": "No Preference",
+      "FOOD": "No Food"
+    }
+  ],
+  "__valid_coaches": "SL | 2A | 3A | 3E | 1A | CC | EC | 2S",
+  "__valid_seats": "Lower | Middle | Upper | Side Lower | Side Upper | Window Side | No Preference",
+  "__valid_genders": "Male | Female | Transgender",
+  "__valid_food_choices": "Veg | Non Veg | No Food"
+}
