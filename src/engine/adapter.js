@@ -58,17 +58,33 @@ function runCypress(job, credentials, onEvent) {
   return new Promise((resolve) => {
     const req = job.request
     const browser = req.browser || 'edge'
-    const cwd = path.join(__dirname, '..', '..')
+        const cwd = path.join(__dirname, '..', '..')
 
-    // Pass the entire BookingRequest as BOOKING_REQUEST env var (JSON string).
-    // Also pass credentials as USERNAME / PASSWORD for the Cypress spec.
+    // WRITE THE FIXTURE DIRECTLY
+    const legacyConfig = {
+      TRAIN_NO: req.trainNumber,
+      TRAIN_COACH: req.coach,
+      TRAVEL_DATE: req.travelDate,
+      SOURCE_STATION: req.source,
+      DESTINATION_STATION: req.destination,
+      BOARDING_STATION: req.boardingStation || null,
+      TATKAL: req.quota === 'TATKAL',
+      PREMIUM_TATKAL: req.quota === 'PREMIUM_TATKAL',
+      UPI_ID_CONFIG: (req.paymentPreference && req.paymentPreference.upiId) || '',
+      PASSENGER_DETAILS: req.passengers.map(p => ({
+        NAME: p.name,
+        AGE: p.age,
+        GENDER: p.gender,
+        SEAT: p.berth || 'No Preference',
+        FOOD: p.food || 'No Food'
+      }))
+    };
+    fs.writeFileSync(path.join(cwd, 'cypress', 'fixtures', 'passenger_data.json'), JSON.stringify(legacyConfig, null, 2));
+
     const env = {
       ...process.env,
-      USERNAME: credentials.username,
-      PASSWORD: credentials.password,
-      BOOKING_REQUEST: JSON.stringify(req),
-      JOB_ID: job.id,
-      JOB_MANAGER_URL: process.env.JOB_MANAGER_URL || 'http://localhost:3001',
+      CYPRESS_USERNAME: credentials.username,
+      CYPRESS_PASSWORD: credentials.password,
     }
 
     const args = [
@@ -86,8 +102,9 @@ function runCypress(job, credentials, onEvent) {
     child.stdout.on('data', (data) => {
       const text = data.toString()
       stdout += text
-      // Forward each line as a LOG event so the UI shows live output
-      text.split('\n').filter(Boolean).forEach(line => {
+      
+      const cleanText = text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
+      cleanText.split('\n').filter(Boolean).forEach(line => {
         if (onEvent) onEvent({ type: 'LOG', state: job.currentState, message: line })
       })
     })
@@ -112,12 +129,13 @@ function runCypress(job, credentials, onEvent) {
         // Non-fatal — artifacts may not exist if Cypress crashed early
       }
 
+      const cleanStderr = stderr ? stderr.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '') : ''
       const result = {
         jobId: job.id,
         success,
         exitCode: code,
         pnr,
-        error: success ? null : (stderr || 'Cypress test run failed'),
+        error: success ? null : (cleanStderr || 'Cypress test run failed'),
       }
 
       writeResult(job.id, result)

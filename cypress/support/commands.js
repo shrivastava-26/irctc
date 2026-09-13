@@ -95,7 +95,7 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
   // FIX: Use placeholder-based selector + fallback to ng-tns class
   // ------------------------------------------------------------------
   cy.get(
-    'input[placeholder="From"], .ui-autocomplete > .ng-tns-c57-8 input, ' +
+    'input[placeholder="From"], ' +
       '.ui-autocomplete input[id*="origin"], .ui-autocomplete input',
     { timeout: 20000 },
   )
@@ -103,7 +103,7 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
     .should('be.visible')
     .type(SOURCE_STATION, { delay: 600 })
 
-  cy.get('#p-highlighted-option, .ui-autocomplete-panel li', { timeout: 10000 })
+  cy.get('.ui-autocomplete-items li, #p-highlighted-option, .ui-autocomplete-panel li', { timeout: 10000 }).filter(':visible')
     .first()
     .click()
 
@@ -112,14 +112,7 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
   // ------------------------------------------------------------------
   // TO station
   // ------------------------------------------------------------------
-  cy.get(
-    'input[placeholder="To"], .ui-autocomplete > .ng-tns-c57-9 input, ' +
-      '.ui-autocomplete input[id*="destination"]',
-    { timeout: 10000 },
-  )
-    .first()
-    .should('be.visible')
-    .type(DESTINATION_STATION, { delay: 600 })
+  cy.get('input[placeholder="To"], .ui-autocomplete input[id*="destination"], .ui-autocomplete input', { timeout: 10000 }).eq(1).should('be.visible').type(DESTINATION_STATION, { delay: 600 })
 
   cy.get('#p-highlighted-option, .ui-autocomplete-panel li', { timeout: 10000 })
     .first()
@@ -130,9 +123,9 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
   // ------------------------------------------------------------------
   // Travel date
   // ------------------------------------------------------------------
-  cy.get('.ui-calendar, p-calendar', { timeout: 10000 }).should('be.visible').click()
+  cy.get('.ui-calendar, p-calendar input', { timeout: 10000 }).first().should('be.visible').click()
   cy.focused().clear()
-  cy.get('.ui-calendar').type(TRAVEL_DATE)
+  cy.get('.ui-calendar, p-calendar input').first().type(TRAVEL_DATE, { delay: 100 })
 
   // ------------------------------------------------------------------
   // Quota (Tatkal / Premium Tatkal)
@@ -172,19 +165,18 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
   // Search button
   // FIX: Use last .search_btn (the search form button, not the login button)
   // ------------------------------------------------------------------
-  cy.get('.search_btn, .col-md-3 > .search_btn, button[class*="search"]', { timeout: 10000 })
-    .last()
-    .should('be.visible')
-    .click()
+  cy.get('button.search_btn, button[type="submit"].search_btn, button[label="Find Trains"], button[class*="search"]', { timeout: 10000 }).filter(':visible').first().should('be.visible').click({ force: true })
 
   cy.task('log', 'Search submitted — waiting for train list...')
 
   // ------------------------------------------------------------------
   // Train list — iterate and find matching train + coach
   // ------------------------------------------------------------------
-  cy.get(':nth-child(n) > .bull-back', { timeout: 30000 }).each((div) => {
+  let trainFound = false;
+    cy.get(':nth-child(n) > .bull-back', { timeout: 30000 }).each((div) => {
     if (div[0].innerText.includes(TRAIN_NO) && div[0].innerText.includes(TRAIN_COACH)) {
-      cy.task('log', `Found train ${TRAIN_NO} coach ${TRAIN_COACH}. Proceeding...`)
+      trainFound = true;
+        cy.task('log', `Found train ${TRAIN_NO} coach ${TRAIN_COACH}. Proceeding...`)
 
       cy.bookUntilTatkalGetsOpen(div, TRAIN_COACH, TRAVEL_DATE, TRAIN_NO, TATKAL).then(() => {
         cy.task('log', 'TATKAL TIME STARTED / Book Now clicked.')
@@ -254,7 +246,11 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
       cy.get('select[formcontrolname="passengerBerthChoice"]', { timeout: 10000 }).each(
         (inputDiv, index) => {
           const pax = PASSENGER_DETAILS[index]
-          cy.wrap(inputDiv).select(pax['SEAT'])
+          if (pax && pax['SEAT'] && pax['SEAT'].toLowerCase() !== 'no preference') {
+            cy.wrap(inputDiv).select(pax['SEAT'])
+          } else {
+            cy.task('log', `Leaving berth choice untouched/default for passenger ${index + 1}`)
+          }
         },
       )
 
@@ -263,7 +259,11 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
         if ($body.find('select[formcontrolname="passengerFoodChoice"]').length > 0) {
           cy.get('select[formcontrolname="passengerFoodChoice"]').each((inputDiv, index) => {
             const pax = PASSENGER_DETAILS[index]
-            cy.wrap(inputDiv).select(pax['FOOD'])
+            if (pax && pax['FOOD'] && pax['FOOD'].toLowerCase() !== 'no food') {
+              cy.wrap(inputDiv).select(pax['FOOD'])
+            } else {
+              cy.task('log', `Leaving food choice untouched/default for passenger ${index + 1}`)
+            }
           })
         }
       })
@@ -347,7 +347,26 @@ Cypress.Commands.add('doPostLoginFlow', (UPI_ID, isValidUpiId) => {
               '[PAYMENT] UPI ID entered. Waiting 2 min for user to approve in UPI app.',
             )
             // Give user 2 minutes to approve UPI push notification
-            cy.wait(120000)
+            
+cy.get('body', { timeout: 180000 }).should(($b) => {
+  const text = $b.text().toUpperCase()
+  const success = text.includes('CONGRATULATIONS') || text.includes('PNR NO')
+  const failure = text.includes('TRANSACTION DECLINED') || text.includes('TRANSACTION FAILED')
+  expect(success || failure, 'Waiting for payment outcome').to.be.true
+}).then(($b) => {
+  const text = $b.text().toUpperCase()
+  if (text.includes('CONGRATULATIONS') || text.includes('PNR NO')) {
+    const pnrMatch = text.match(/PNR\s*NO\s*:?\s*(\d{10})/i)
+    if (pnrMatch) {
+      cy.task('log', 'PNR: ' + pnrMatch[1])
+    } else {
+      cy.task('log', 'PNR: NOT_FOUND_IN_DOM')
+    }
+  } else {
+    throw new Error('Payment Failed or Declined.')
+  }
+})
+
           } else {
             cy.task(
               'log',
@@ -373,18 +392,17 @@ function performLogin(LOGGED_IN) {
       .then((el) => {
         const bodyText = el[0].innerText
 
-        if (bodyText.includes('Logout') || bodyText.includes('My Account')) {
+        if (bodyText.includes('LOGOUT') || bodyText.includes('MY ACCOUNT') || bodyText.includes('WELCOME')) {
           cy.task('log', 'Logged in successfully.')
           return
         }
 
         // Login panel is open when "FORGOT ACCOUNT DETAILS" or "Sign In" visible
         const loginPanelOpen =
-          bodyText.includes('FORGOT ACCOUNT DETAILS') ||
-          bodyText.includes('Sign In') ||
+          bodyText.includes('FORGOT ACCOUNT DETAILS') || bodyText.includes('SIGN IN') ||
           el[0].querySelector('input[placeholder="User Name"]') !== null
 
-        if (loginPanelOpen && !bodyText.includes('Please Wait...')) {
+        if (loginPanelOpen && !bodyText.includes('PLEASE WAIT...')) {
           // FIXED: Check for CAPTCHA element in DOM before deciding OCR vs direct
           const captchaElement = el[0].querySelector('.captcha-img')
           const hasCaptcha = captchaElement !== null
@@ -400,7 +418,7 @@ function performLogin(LOGGED_IN) {
             cy.wait(2000)
             cy.get('body').then((updatedEl) => {
               const updatedText = updatedEl[0].innerText
-              if (updatedText.includes('Logout') || updatedText.includes('My Account')) {
+              if (updatedText.toUpperCase().includes('LOGOUT') || updatedText.toUpperCase().includes('MY ACCOUNT')) {
                 cy.task('log', '[LOGIN] Login successful (no CAPTCHA path).')
               } else if (updatedEl[0].querySelector('.captcha-img')) {
                 // CAPTCHA appeared after login attempt — now solve it
@@ -415,7 +433,7 @@ function performLogin(LOGGED_IN) {
                 } else {
                   solveAndRetryLogin()
                 }
-              } else if (updatedText.includes('Invalid Password')) {
+              } else if (updatedText.toUpperCase().includes('INVALID PASSWORD')) {
                 cy.task('log', '[LOGIN ERROR] Invalid password.')
               } else {
                 performLogin(LOGGED_IN)
@@ -526,6 +544,14 @@ function solveCaptcha() {
 // BOOK_UNTIL_TATKAL_OPENS — Tatkal timing logic (preserved from original)
 // ---------------------------------------------------------------------------
 function BOOK_UNTIL_TATKAL_OPENS(div, TRAIN_COACH, TRAVEL_DATE, TRAIN_NO, TATKAL) {
+  cy.wrap(div).scrollIntoView({ offset: { top: -200, left: 0 } });
+  cy.wait(1000);
+  cy.wrap(div).find('div, td, li').filter((i, el) => Cypress.$(el).text().includes(TRAIN_COACH) && Cypress.$(el).text().match(/Refresh/i)).last().click();
+  cy.wait(5000);
+  
+  // MINIMAL FIX: Click the date tile to select the class before clicking Book Now
+  cy.wrap(div).find('div.pre-avl').first().click();
+  
   if (!TATKAL) {
     // General booking — click Book Now immediately
     cy.wrap(div)

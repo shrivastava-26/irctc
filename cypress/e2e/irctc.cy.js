@@ -52,13 +52,29 @@ describe('IRCTC TATKAL BOOKING', () => {
       expect(false, 'Make Sure Either TATKAL or PREMIUM TATKAL is True. Not BOTH').to.be.true
     }
 
+    // DIAGNOSTIC: Intercept all requests to diagnose the login failure
+    cy.intercept('*').as('allRequests')
+    cy.on('request', (req) => {
+      if (req.method === 'POST' && (req.url.includes('login') || req.url.includes('auth') || req.url.includes('token'))) {
+        cy.task('log', `[DIAGNOSTIC] Intercepted POST ${req.url}`)
+        req.on('response', (res) => {
+          cy.task('log', `[DIAGNOSTIC] Response for ${req.url}: Status ${res.statusCode}`)
+          cy.task('log', `[DIAGNOSTIC] Body: ${JSON.stringify(res.body).substring(0, 200)}`)
+        })
+      }
+    })
+
     cy.clearCookies()
     cy.clearLocalStorage()
     cy.viewport(1478, 1056)
-    cy.visit('https://www.irctc.co.in/nget/train-search', {
-      failOnStatusCode: false,
-      timeout: 90000,
-    })
+    cy.task('log', 'Navigating to IRCTC portal...')
+    if (Cypress.env('MOCK_IRCTC')) {
+      cy.visit('cypress/fixtures/mock.html');
+    } else {
+      cy.window().then((win) => {
+        win.location.href = 'https://www.irctc.co.in/nget/train-search'
+      })
+    }
 
     cy.task('log', `Website Fetching completed.........`)
 
@@ -70,6 +86,15 @@ describe('IRCTC TATKAL BOOKING', () => {
     // FIX 1: Open Login Panel — text-based selector replaces stale .h_head1 > .search_btn
     // ------------------------------------------------------------------
     cy.get('body', { timeout: 30000 }).then(($body) => {
+      
+      // Handle Language Modal if it covers the screen
+      const modalBtn = $body.find('button, a, span').filter((i, el) => /english/i.test(el.innerText || el.textContent))
+      if (modalBtn.length && modalBtn.is(':visible')) {
+        cy.task('log', 'Dismissing language modal...')
+        cy.wrap(modalBtn).first().click()
+        cy.get('.ui-dialog-mask, .custom-blur-mask, .ui-widget-overlay, .ui-dialog-visible', { timeout: 15000 }).should('not.exist')
+      }
+
       // Already logged in? Skip to flow.
       if ($body.text().includes('Logout') || $body.text().includes('My Account')) {
         cy.task('log', 'Already authenticated — skipping login.')
@@ -85,14 +110,14 @@ describe('IRCTC TATKAL BOOKING', () => {
         .first()
         .then(($el) => {
           if ($el.length) {
-            cy.wrap($el).click()
+            cy.wrap($el).click({ timeout: 15000 })
           } else {
             // Fallback: text-based match
             cy.contains('a, button, span', /LOGIN\s*\/\s*REGISTER|Login\s*\/\s*Register/i, {
               timeout: 15000,
             })
               .first()
-              .click()
+              .click({ timeout: 15000 })
           }
         })
 

@@ -35,8 +35,10 @@ async function execute(job) {
       const credentials = await CredentialManager.getCredentials(job.request.credentialsReference)
       const result = await runCypress(job, credentials, (event) => onEngineEvent(job, event))
 
-      if (result.success) {
+      if (result.success && result.pnr) {
         job.complete(result.pnr)
+      } else if (result.success && !result.pnr) {
+        job.fail('Execution finished but no PNR was extracted. Booking not confirmed.')
       } else {
         job.fail(result.error || 'Cypress test run failed')
       }

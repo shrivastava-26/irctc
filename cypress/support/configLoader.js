@@ -11,7 +11,7 @@ import legacyFixture from '../fixtures/passenger_data.json';
  * to maintain 100% backward compatibility with manual CLI execution.
  */
 
-let rawBookingReq = Cypress.env('BOOKING_REQUEST');
+let rawBookingReq = Cypress.env('BOOKING_REQUEST'); console.log('RAW_BOOKING_REQ:', rawBookingReq);
 const bookingRequest = typeof rawBookingReq === 'string' 
   ? JSON.parse(rawBookingReq) 
   : rawBookingReq;

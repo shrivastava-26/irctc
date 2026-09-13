@@ -51,7 +51,7 @@ module.exports = defineConfig({
           let state = null;
           const msg = message.toLowerCase();
           
-          if (msg.includes('login') || msg.includes('captcha') || msg.includes('authenticated')) {
+          if (msg.includes('login') || msg.includes('captcha') || msg.includes('authenticated') || msg.includes('navigating to irctc')) {
             state = 'LOGIN';
           } else if (msg.includes('station set') || msg.includes('search submitted')) {
             state = 'SEARCH';

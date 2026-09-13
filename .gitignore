@@ -1,19 +1,82 @@
+# One-off debugging / patch / migration helper scripts
+apply_fixes.js
+apply_minimal_fix.py
+date_templ.txt
+empty.py
+fix_date.py
+fix.js
+fix.py
+fix_mock_btn3.py
+fix_search.py
+from_templ.txt
+inject_intercept.py
+inject_read_only.py
+patch.js
+remove_filter.py
+remove_filter2.py
+remove_intercept.py
+rename.js
+restore_filter.py
+restore_filter2.py
+search_templ.txt
+template.txt
+to_templ.txt
+update_intercept.js
+update_mock_btn_onclick.py
+update_mock_btn2.py
+update_mock_form.py
+update_mock_pay.py
+update_mock_pay2.py
+update_mock_pay3.py
+update_mock_pay4.py
+update_mock_review.py
+update_mock_tile.py
+update_mock_tile2.py
+update_mock.py
+update_mock2.py
+update_mock3.py
+update_mock4.py
+update_mock5.py
+update_optional_fields.py
+update_visit.py
+write_html.js
+write_html.py
+write_mock.js
+write_mock.py
+
+
+# Dependencies
 node_modules/
-.npm-cache/
+ui/node_modules/
+
+# Local secrets/config
+.env
+cypress.env.json
+
+# Cypress generated output
 cypress/videos/
 cypress/screenshots/
 cypress/downloads/
-cypress.env.json
-.env
 
-# EasyOCR model files (large binary files — downloaded automatically)
+# Temporary DOM/debug dumps
+cypress/dom_dump*.html
+
+# Local mock/test artifacts
+cypress/mock-irctc.html
+cypress/fixtures/mock.html
+cypress/support/mock-boundary.js
+
+# Runtime-generated job artifacts
+artifacts/jobs/
+
+# Local OCR/model data
 EasyOCR/
-*.pth
-*.onnx
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
+# Generated verification reports
+final_verification_report_v2.md
+
+# Temporary backup / debugging files
+old_commands.js
+repair.js
+update_mock_btn.py
+update_mock_js.py
