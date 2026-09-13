@@ -15,7 +15,7 @@
 // bookUntilTatkalGetsOpen Tatkal timing, full passenger form flow.
 // ---------------------------------------------------------------------------
 
-import { formatDate, hasTatkalAlreadyOpened, tatkalOpenTimeForToday } from '../utils/index'
+import { hasTatkalAlreadyOpened, tatkalOpenTimeForToday } from '../utils/index'
 import {
   PASSENGER_DETAILS,
   SOURCE_STATION,
@@ -26,7 +26,7 @@ import {
   TATKAL,
   PREMIUM_TATKAL,
   BOARDING_STATION,
-} from '../fixtures/passenger_data.json'
+} from '../support/configLoader'
 
 const MANUAL_CAPTCHA = Cypress.env('MANUAL_CAPTCHA')
 

@@ -1,0 +1,180 @@
+{
+  "browserName": "edge",
+  "browserPath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "browserVersion": "151.0.4129.101",
+  "config": {
+    "configFile": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\cypress.config.js",
+    "testingType": "e2e",
+    "projectId": "7afdkj",
+    "defaultCommandTimeout": 10000,
+    "pageLoadTimeout": 90000,
+    "responseTimeout": 60000,
+    "requestTimeout": 60000,
+    "video": true,
+    "screenshotOnRunFailure": true,
+    "chromeWebSecurity": false,
+    "experimentalModifyObstructiveThirdPartyCode": true,
+    "projectRoot": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc",
+    "projectName": "irctc",
+    "isTextTerminal": true,
+    "screenshotsFolder": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\artifacts\\jobs\\84d0f799-683e-4904-b419-1b026e101ec7\\screenshots",
+    "videosFolder": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\artifacts\\jobs\\84d0f799-683e-4904-b419-1b026e101ec7\\video",
+    "animationDistanceThreshold": 5,
+    "arch": "x64",
+    "baseUrl": null,
+    "blockHosts": null,
+    "clientCertificates": [],
+    "defaultBrowser": null,
+    "downloadsFolder": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\cypress\\downloads",
+    "env": {
+      "USERNAME": "princeshrivastava014",
+      "PASSWORD": "Rasamrice@30",
+      "MANUAL_CAPTCHA": false,
+      "UPI_ID": "9576454311@ybl",
+      "BOOKING_REQUEST": "{\"credentialsReference\":\"princeshrivastava014\",\"source\":\"NDLS\",\"destination\":\"MMCT\",\"travelDate\":\"20/09/2026\",\"quota\":\"GENERAL\",\"trainNumber\":\"12952\",\"coach\":\"3A\",\"passengers\":[{\"name\":\"prince\",\"age\":30,\"gender\":\"Male\",\"berth\":\"No Preference\",\"food\":\"No Food\"}],\"paymentPreference\":{\"method\":\"UPI\",\"upiId\":\"9576454311@ybl\"},\"executionMode\":\"NOW\",\"isMock\":false,\"browser\":\"edge\"}",
+      "JOB_WEBHOOK_URL": "http://127.0.0.1:54669"
+    },
+    "execTimeout": 60000,
+    "experimentalCspAllowList": false,
+    "experimentalFetchPolyfill": false,
+    "experimentalInteractiveRunEvents": false,
+    "experimentalRunAllSpecs": false,
+    "experimentalMemoryManagement": false,
+    "experimentalSkipDomainInjection": null,
+    "experimentalJustInTimeCompile": false,
+    "experimentalOriginDependencies": false,
+    "experimentalSourceRewriting": false,
+    "experimentalSingleTabRunMode": false,
+    "experimentalStudio": false,
+    "experimentalWebKitSupport": false,
+    "fileServerFolder": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc",
+    "fixturesFolder": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\cypress\\fixtures",
+    "excludeSpecPattern": "*.hot-update.js",
+    "includeShadowDom": false,
+    "keystrokeDelay": 0,
+    "modifyObstructiveCode": true,
+    "numTestsKeptInMemory": 0,
+    "platform": "win32",
+    "port": 57691,
+    "redirectionLimit": 20,
+    "reporter": "spec",
+    "reporterOptions": null,
+    "resolvedNodePath": "C:\\Program Files\\nodejs\\node.exe",
+    "resolvedNodeVersion": "22.19.0",
+    "retries": {
+      "runMode": 0,
+      "openMode": 0
+    },
+    "slowTestThreshold": 10000,
+    "scrollBehavior": "top",
+    "supportFile": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\cypress\\support\\e2e.js",
+    "taskTimeout": 60000,
+    "testIsolation": true,
+    "trashAssetsBeforeRuns": true,
+    "userAgent": null,
+    "videoCompression": false,
+    "viewportHeight": 660,
+    "viewportWidth": 1000,
+    "waitForAnimations": true,
+    "watchForFileChanges": false,
+    "specPattern": "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
+    "browsers": [
+      {
+        "channel": "stable",
+        "displayName": "Edge",
+        "family": "chromium",
+        "majorVersion": "151",
+        "name": "edge",
+        "path": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+        "version": "151.0.4129.101"
+      },
+      {
+        "channel": "stable",
+        "displayName": "Electron",
+        "family": "chromium",
+        "majorVersion": 118,
+        "name": "electron",
+        "path": "",
+        "version": "118.0.5993.159"
+      }
+    ],
+    "cypressBinaryRoot": "C:\\Users\\princ\\AppData\\Local\\Cypress\\Cache\\13.17.0\\Cypress\\resources\\app",
+    "hosts": null,
+    "isInteractive": true,
+    "version": "13.17.0",
+    "browser": null,
+    "cypressInternalEnv": "production"
+  },
+  "cypressVersion": "13.17.0",
+  "endedTestsAt": "2026-09-12T19:34:51.298Z",
+  "osName": "win32",
+  "osVersion": "10.0.26200",
+  "runs": [
+    {
+      "error": null,
+      "reporter": "spec",
+      "reporterStats": {
+        "suites": 1,
+        "tests": 1,
+        "passes": 0,
+        "pending": 0,
+        "failures": 1,
+        "start": "2026-09-12T19:33:28.145Z",
+        "end": "2026-09-12T19:34:51.311Z",
+        "duration": 83166
+      },
+      "screenshots": [
+        {
+          "height": 899,
+          "name": null,
+          "path": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\artifacts\\jobs\\84d0f799-683e-4904-b419-1b026e101ec7\\screenshots\\irctc.cy.js\\IRCTC TATKAL BOOKING -- Tatkal Booking Begins (failed).png",
+          "takenAt": "2026-09-12T19:34:50.466Z",
+          "width": 1913
+        }
+      ],
+      "spec": {
+        "absolute": "C:/Users/princ/OneDrive/Desktop/undefined/irctc/cypress/e2e/irctc.cy.js",
+        "fileExtension": ".js",
+        "fileName": "irctc",
+        "name": "irctc.cy.js",
+        "relative": "cypress\\e2e\\irctc.cy.js"
+      },
+      "stats": {
+        "duration": 83169,
+        "endedAt": "2026-09-12T19:34:51.298Z",
+        "failures": 1,
+        "passes": 0,
+        "pending": 0,
+        "skipped": 0,
+        "startedAt": "2026-09-12T19:33:28.129Z",
+        "suites": 1,
+        "tests": 1
+      },
+      "tests": [
+        {
+          "attempts": [
+            {
+              "state": "failed"
+            }
+          ],
+          "displayError": "AssertionError: Timed out retrying after 45000ms: Expected to find content: '/Passenger Details|Traveller Details/i' but never did.\n    at Context.eval (webpack://irctc-cypress-automation/./cypress/support/commands.js:388:89)",
+          "duration": 82953,
+          "state": "failed",
+          "title": [
+            "IRCTC TATKAL BOOKING",
+            "Tatkal Booking Begins......"
+          ]
+        }
+      ],
+      "video": "C:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\artifacts\\jobs\\84d0f799-683e-4904-b419-1b026e101ec7\\video\\irctc.cy.js.mp4"
+    }
+  ],
+  "startedTestsAt": "2026-09-12T19:33:28.129Z",
+  "totalDuration": 83169,
+  "totalFailed": 1,
+  "totalPassed": 0,
+  "totalPending": 0,
+  "totalSkipped": 0,
+  "totalSuites": 1,
+  "totalTests": 1
+}

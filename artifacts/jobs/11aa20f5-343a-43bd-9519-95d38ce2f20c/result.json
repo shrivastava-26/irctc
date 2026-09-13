@@ -1,0 +1,7 @@
+{
+  "jobId": "11aa20f5-343a-43bd-9519-95d38ce2f20c",
+  "success": false,
+  "exitCode": 3221226505,
+  "pnr": null,
+  "error": "Cypress test run failed"
+}

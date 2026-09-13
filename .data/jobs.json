@@ -1,0 +1,553 @@
+[
+  {
+    "id": "6981bedf-1481-4180-aff8-919715eecf60",
+    "createdAt": "2026-09-12T20:26:05.710Z",
+    "scheduledAt": null,
+    "status": "COMPLETED",
+    "request": {
+      "credentialsReference": "mockuser",
+      "source": "NDLS",
+      "destination": "MMCT",
+      "travelDate": "20/10/2026",
+      "quota": "GENERAL",
+      "trainNumber": "12952",
+      "coach": "3A",
+      "passengers": [
+        {
+          "name": "Test",
+          "age": 30,
+          "gender": "Male"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI"
+      },
+      "executionMode": "NOW",
+      "isMock": true
+    },
+    "currentState": "BOOKING_CONFIRMED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-12T20:26:05.739Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "LOGIN",
+        "message": "Mock: Logging in as mockuser...",
+        "timestamp": "2026-09-12T20:26:06.521Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "SEARCH",
+        "message": "Mock: Searching trains from NDLS...",
+        "timestamp": "2026-09-12T20:26:07.549Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "TRAIN_FOUND",
+        "message": "Mock: train=12952 found.",
+        "timestamp": "2026-09-12T20:26:08.586Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "PAYMENT",
+        "message": "Mock: Proceeding to UPI payment.",
+        "timestamp": "2026-09-12T20:26:09.602Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "BOOKING_CONFIRMED",
+        "message": "Mock: Payment successful. Ticket booked.",
+        "timestamp": "2026-09-12T20:26:10.619Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "BOOKING_CONFIRMED",
+        "jobStatus": "COMPLETED",
+        "timestamp": "2026-09-12T20:26:10.625Z"
+      }
+    ],
+    "errorInformation": null,
+    "completedAt": "2026-09-12T20:26:10.625Z"
+  },
+  {
+    "id": "6e29197a-9651-4cb3-9076-dee3488dac3d",
+    "createdAt": "2026-09-12T20:26:10.826Z",
+    "scheduledAt": null,
+    "status": "FAILED",
+    "request": {
+      "credentialsReference": "mockuser",
+      "trainNumber": "00000",
+      "executionMode": "NOW",
+      "isMock": true
+    },
+    "currentState": "TRAIN_SELECTION",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-12T20:26:10.839Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "LOGIN",
+        "message": "Mock: Logging in as mockuser...",
+        "timestamp": "2026-09-12T20:26:11.365Z"
+      },
+      {
+        "type": "STATE_CHANGED",
+        "state": "SEARCH",
+        "message": "Mock: Searching trains from undefined...",
+        "timestamp": "2026-09-12T20:26:12.380Z"
+      },
+      {
+        "type": "FAILURE",
+        "state": "TRAIN_SELECTION",
+        "message": "Mock: Train not found (simulated error)",
+        "timestamp": "2026-09-12T20:26:12.897Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "TRAIN_SELECTION",
+        "jobStatus": "FAILED",
+        "timestamp": "2026-09-12T20:26:12.902Z"
+      }
+    ],
+    "errorInformation": "Simulated train lookup failure",
+    "completedAt": "2026-09-12T20:26:12.902Z"
+  },
+  {
+    "id": "af4d960f-1d9a-4714-a4cc-97a07cbabe47",
+    "createdAt": "2026-09-12T20:26:45.632Z",
+    "scheduledAt": null,
+    "status": "FAILED",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "MMCT",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "12952",
+      "coach": "3A",
+      "passengers": [
+        {
+          "name": "prince",
+          "age": 30,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "9576454311@ybl"
+      },
+      "executionMode": "NOW",
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-12T20:26:48.413Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Website Fetching completed.........",
+        "timestamp": "2026-09-12T20:27:20.756Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Language modal detected — selecting English.",
+        "timestamp": "2026-09-12T20:27:34.642Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Language modal dismissed.",
+        "timestamp": "2026-09-12T20:27:35.669Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Waiting for Login Modal or Authenticated State...",
+        "timestamp": "2026-09-12T20:27:37.930Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "FAILED",
+        "timestamp": "2026-09-12T20:27:51.962Z"
+      }
+    ],
+    "errorInformation": "1 tests failed.",
+    "completedAt": "2026-09-12T20:27:51.961Z"
+  },
+  {
+    "id": "2aa3b09e-900b-4550-8027-5dc0d5e49c9b",
+    "createdAt": "2026-09-12T20:49:34.634Z",
+    "scheduledAt": null,
+    "status": "FAILED",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "MMCT",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "12952",
+      "coach": "3A",
+      "passengers": [
+        {
+          "name": "prince",
+          "age": 30,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "9576454311@ybl"
+      },
+      "executionMode": "NOW",
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-12T20:49:39.450Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Website Fetching completed.........",
+        "timestamp": "2026-09-12T20:50:13.857Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Language modal detected — selecting English.",
+        "timestamp": "2026-09-12T20:50:26.362Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "Language modal dismissed.",
+        "timestamp": "2026-09-12T20:50:27.318Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "[LOGIN] No CAPTCHA detected — clicking Sign In directly.",
+        "timestamp": "2026-09-12T20:50:29.528Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "FAILED",
+        "timestamp": "2026-09-12T20:55:23.525Z"
+      }
+    ],
+    "errorInformation": "Could not find Cypress test run results",
+    "completedAt": "2026-09-12T20:55:23.525Z"
+  },
+  {
+    "id": "fbe47bbb-7fa7-426d-a4c8-1b24957a5069",
+    "createdAt": "2026-09-13T04:39:36.251Z",
+    "scheduledAt": null,
+    "status": "FAILED",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "PATNA JN - PNBE",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "22362",
+      "coach": "SL",
+      "boardingStation": null,
+      "passengers": [
+        {
+          "name": "pronce",
+          "age": 24,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "prince9b407@oksbi"
+      },
+      "executionMode": "NOW",
+      "scheduledAt": null,
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-13T04:39:36.263Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\r",
+        "timestamp": "2026-09-13T04:39:52.408Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "FAILED",
+        "message": "Cypress test run failed",
+        "timestamp": "2026-09-13T04:39:53.690Z"
+      }
+    ],
+    "errorInformation": "Cypress test run failed",
+    "completedAt": "2026-09-13T04:39:53.690Z"
+  },
+  {
+    "id": "24c33101-56e3-40bd-9650-98b968ec6f37",
+    "createdAt": "2026-09-13T04:39:44.407Z",
+    "scheduledAt": null,
+    "status": "RUNNING",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "PATNA JN - PNBE",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "22362",
+      "coach": "SL",
+      "boardingStation": null,
+      "passengers": [
+        {
+          "name": "pronce",
+          "age": 24,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "prince9b407@oksbi"
+      },
+      "executionMode": "NOW",
+      "scheduledAt": null,
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-13T04:39:44.407Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\r",
+        "timestamp": "2026-09-13T04:39:52.433Z"
+      }
+    ],
+    "errorInformation": null,
+    "completedAt": null
+  },
+  {
+    "id": "11aa20f5-343a-43bd-9519-95d38ce2f20c",
+    "createdAt": "2026-09-13T04:39:56.359Z",
+    "scheduledAt": null,
+    "status": "FAILED",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "PATNA JN - PNBE",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "22362",
+      "coach": "SL",
+      "boardingStation": null,
+      "passengers": [
+        {
+          "name": "pronce",
+          "age": 24,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "prince9b407@oksbi"
+      },
+      "executionMode": "NOW",
+      "scheduledAt": null,
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-13T04:39:56.359Z"
+      },
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "FAILED",
+        "message": "Cypress test run failed",
+        "timestamp": "2026-09-13T04:40:15.910Z"
+      }
+    ],
+    "errorInformation": "Cypress test run failed",
+    "completedAt": "2026-09-13T04:40:15.910Z"
+  },
+  {
+    "id": "0b4444be-26fe-4012-a052-26c8bd96bc15",
+    "createdAt": "2026-09-13T05:23:36.655Z",
+    "scheduledAt": null,
+    "status": "RUNNING",
+    "request": {
+      "credentialsReference": "princeshrivastava014",
+      "source": "NDLS",
+      "destination": "PNBE",
+      "travelDate": "20/09/2026",
+      "quota": "GENERAL",
+      "trainNumber": "22362",
+      "coach": "3A",
+      "boardingStation": null,
+      "passengers": [
+        {
+          "name": "pronce",
+          "age": 30,
+          "gender": "Male",
+          "berth": "No Preference",
+          "food": "No Food"
+        }
+      ],
+      "paymentPreference": {
+        "method": "UPI",
+        "upiId": "prince9b407@oksbi"
+      },
+      "executionMode": "NOW",
+      "scheduledAt": null,
+      "isMock": false,
+      "browser": "edge"
+    },
+    "currentState": "JOB_CREATED",
+    "progressEvents": [
+      {
+        "type": "STATUS_CHANGED",
+        "state": "JOB_CREATED",
+        "jobStatus": "STARTING",
+        "timestamp": "2026-09-13T05:23:36.658Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\r",
+        "timestamp": "2026-09-13T05:23:52.345Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m====================================================================================================\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.827Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[0m  (\u001b[4m\u001b[1mRun Starting\u001b[22m\u001b[24m)\u001b[0m",
+        "timestamp": "2026-09-13T05:24:19.832Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  ┌\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m┐\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.857Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mCypress:\u001b[39m        13.17.0                                                                        \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.861Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mBrowser:\u001b[39m        Edge 153                                                                       \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.867Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mNode Version:\u001b[39m   \u001b[0mv22.19.0 \u001b[90m(C:\\Program Files\\nodejs\\node.exe)\u001b[39m\u001b[0m                                    \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.871Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mSpecs:\u001b[39m          \u001b[0m1 found (irctc.cy.js)\u001b[0m                                                          \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.877Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mSearched:\u001b[39m       \u001b[0mC:\\Users\\princ\\OneDrive\\Desktop\\undefined\\irctc\\cypress\\e2e\\irctc.cy.js\u001b[0m        \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.882Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  │\u001b[39m \u001b[90mExperiments:\u001b[39m    experimentalModifyObstructiveThirdPartyCode=true                               \u001b[90m│\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.888Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m  └\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m┘\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.899Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m\u001b[90m─\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.912Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "                                                                                                    ",
+        "timestamp": "2026-09-13T05:24:19.921Z"
+      },
+      {
+        "type": "LOG",
+        "state": "JOB_CREATED",
+        "message": "  Running:  \u001b[90mirctc.cy.js\u001b[39m                                                                     \u001b[90m(1 of 1)\u001b[39m",
+        "timestamp": "2026-09-13T05:24:19.929Z"
+      }
+    ],
+    "errorInformation": null,
+    "completedAt": null
+  }
+]

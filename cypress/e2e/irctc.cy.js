@@ -34,17 +34,10 @@
 let username = Cypress.env('USERNAME')
 let password = Cypress.env('PASSWORD')
 import {
-  PASSENGER_DETAILS,
-  SOURCE_STATION,
-  DESTINATION_STATION,
-  TRAIN_NO,
-  TRAIN_COACH,
-  TRAVEL_DATE,
   TATKAL,
   PREMIUM_TATKAL,
-  BOARDING_STATION,
   UPI_ID_CONFIG,
-} from '../fixtures/passenger_data.json'
+} from '../support/configLoader'
 
 Cypress.on('uncaught:exception', (err, runnable) => {
   // Suppress Angular zone.js uncaught exceptions — IRCTC emits these constantly.
