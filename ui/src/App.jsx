@@ -23,13 +23,19 @@ export default function App() {
   useEffect(() => {
     try {
       const savedAccs = JSON.parse(localStorage.getItem('irctc_accounts') || '[]')
-      setAccounts(savedAccs)
+      const safeSavedAccs = savedAccs.map(({ password, ...account }) => account)
+      setAccounts(safeSavedAccs)
+
+      if (safeSavedAccs.length !== savedAccs.length ||
+          savedAccs.some(account => Object.prototype.hasOwnProperty.call(account, 'password'))) {
+        localStorage.setItem('irctc_accounts', JSON.stringify(safeSavedAccs))
+      }
 
       const selected = localStorage.getItem('irctc_selected_account')
-      if (selected && savedAccs.some(account => account.id === selected)) {
+      if (selected && safeSavedAccs.some(account => account.id === selected)) {
         setSelectedAccountId(selected)
-      } else if (savedAccs.length > 0) {
-        setSelectedAccountId(savedAccs[0].id)
+      } else if (safeSavedAccs.length > 0) {
+        setSelectedAccountId(safeSavedAccs[0].id)
       }
 
       const savedJourneys = JSON.parse(localStorage.getItem('irctc_journeys') || '[]')
