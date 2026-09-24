@@ -16,7 +16,7 @@ RUN cd ui && npm install --include=dev
 
 COPY . .
 
-RUN npm run build
+RUN cd ui && npm run build
 
 EXPOSE 10000
 
