@@ -1,47 +1,54 @@
-// src/security/CredentialManager.js
-// Retrieves credentials from Windows Credential Manager via keytar.
-// Falls back to process.env when running in CI or when keytar is unavailable.
+// Hosted credential manager.
+// Render is a Linux web service, so Windows keytar/Secret Service is not used.
+// Credentials are held only in this process. Use a managed secrets store for
+// durable production multi-account storage.
 
-let keytar
-try {
-  keytar = require('keytar')
-} catch {
-  keytar = null
+const sessionCredentials = new Map()
+
+function normalizeAccountName(accountName) {
+  return String(accountName || '').trim()
 }
 
-const SERVICE_NAME = 'irctc-automation'
-
 async function getCredentials(accountName) {
-  // Check environment variables first (CI / Docker override)
   const envUser = process.env.IRCTC_USERNAME
   const envPass = process.env.IRCTC_PASSWORD
+
   if (envUser && envPass) {
     return { username: envUser, password: envPass }
   }
 
-  if (!keytar) {
+  const key = normalizeAccountName(accountName)
+  const stored = sessionCredentials.get(key)
+
+  if (!stored) {
     throw new Error(
-      `keytar not available and no IRCTC_USERNAME/IRCTC_PASSWORD env vars set. ` +
-      `Cannot retrieve credentials for account "${accountName}".`
+      'No credentials available for this account in the current server session. ' +
+      'Save the account again after a server restart.'
     )
   }
 
-  // Retrieve from Windows Credential Manager
-  // Stored under service=irctc-automation, account=<credentialsReference>
-  const password = await keytar.getPassword(SERVICE_NAME, accountName)
-  if (!password) {
-    throw new Error(
-      `No credentials found in Windows Credential Manager for service="${SERVICE_NAME}" account="${accountName}". ` +
-      `Set them with: keytar.setPassword("${SERVICE_NAME}", "${accountName}", "<password>")`
-    )
-  }
-
-  return { username: accountName, password }
+  return Object.assign({}, stored)
 }
 
 async function setCredentials(accountName, password) {
-  if (!keytar) throw new Error('keytar not available')
-  await keytar.setPassword(SERVICE_NAME, accountName, password)
+  const key = normalizeAccountName(accountName)
+
+  if (!key || !password) {
+    throw new Error('accountName and password are required')
+  }
+
+  sessionCredentials.set(key, {
+    username: key,
+    password: String(password),
+  })
 }
 
-module.exports = { getCredentials, setCredentials }
+async function listCredentialReferences() {
+  return Array.from(sessionCredentials.keys())
+}
+
+module.exports = {
+  getCredentials,
+  setCredentials,
+  listCredentialReferences,
+}
