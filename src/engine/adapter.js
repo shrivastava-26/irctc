@@ -2,11 +2,77 @@
 // Launches Cypress with booking request env vars.
 // Captures Cypress exit code and copies artifacts into artifacts/jobs/<jobId>/.
 
-const { spawn } = require('child_process')
+const { spawn, execFile } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 
 const CYPRESS_ARTIFACTS_DIR = path.join(__dirname, '..', '..', 'artifacts')
+
+let cypressReadyPromise = null
+
+function execCypress(args, cwd, env) {
+  return new Promise((resolve) => {
+    execFile('npx', ['--no-install', 'cypress', ...args], {
+      cwd,
+      env,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      resolve({
+        ok: !error,
+        stdout: stdout || '',
+        stderr: stderr || '',
+        error,
+      })
+    })
+  })
+}
+
+async function ensureCypressBinary(cwd, env, onEvent) {
+  if (cypressReadyPromise) return cypressReadyPromise
+
+  cypressReadyPromise = (async () => {
+    const verify = await execCypress(['verify'], cwd, env)
+
+    if (verify.ok) return
+
+    if (onEvent) {
+      onEvent({
+        type: 'LOG',
+        message: 'Cypress binary not ready at runtime — installing the matching binary...',
+      })
+    }
+
+    const install = await new Promise((resolve) => {
+      execFile('npx', ['cypress', 'install'], {
+        cwd,
+        env,
+        windowsHide: true,
+      }, (error, stdout, stderr) => {
+        resolve({ ok: !error, stdout: stdout || '', stderr: stderr || '' })
+      })
+    })
+
+    if (!install.ok) {
+      throw new Error(
+        'Cypress binary installation failed: ' +
+        (install.stderr || 'unknown installer error').trim()
+      )
+    }
+
+    const finalVerify = await execCypress(['verify'], cwd, env)
+    if (!finalVerify.ok) {
+      throw new Error(
+        'Cypress binary verification failed: ' +
+        (finalVerify.stderr || finalVerify.stdout || 'unknown verification error').trim()
+      )
+    }
+  })().catch((error) => {
+    cypressReadyPromise = null
+    throw error
+  })
+
+  return cypressReadyPromise
+}
 
 function copyArtifacts(jobId, cypressRunDir) {
   const jobArtifactsDir = path.join(CYPRESS_ARTIFACTS_DIR, 'jobs', jobId)
@@ -57,8 +123,9 @@ function writeResult(jobId, result) {
 function runCypress(job, credentials, onEvent) {
   return new Promise((resolve) => {
     const req = job.request
-    const browser = req.browser || 'edge'
-        const cwd = path.join(__dirname, '..', '..')
+    const browser = process.env.CYPRESS_BROWSER || req.browser || 'edge'
+
+    await ensureCypressBinary(cwd, env, onEvent)
 
     // WRITE THE FIXTURE DIRECTLY
     const legacyConfig = {
@@ -87,14 +154,18 @@ function runCypress(job, credentials, onEvent) {
       CYPRESS_PASSWORD: credentials.password,
     }
 
+    const childOptions = { cwd, env, shell: true }
     const args = [
       'cypress', 'run',
       '--browser', browser,
-      '--headed',
       '--spec', 'cypress/e2e/irctc.cy.js',
     ]
 
-    const child = spawn('npx', args, { cwd, env, shell: true })
+    if (process.env.CYPRESS_HEADED === 'true') {
+      args.splice(2, 0, '--headed')
+    }
+
+    const child = spawn('npx', args, childOptions)
 
     let stdout = ''
     let stderr = ''
