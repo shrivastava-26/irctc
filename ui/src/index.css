@@ -1,5 +1,68 @@
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   padding: 0;
+  background: #f4f6f8;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.MuiDialogContent-root {
+  overflow-x: hidden;
+}
+
+.MuiTableContainer-root {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 600px) {
+  .MuiTableCell-root {
+    padding: 7px 8px !important;
+  }
+
+  .MuiTypography-h6 {
+    font-size: 1rem !important;
+  }
+
+  .MuiButton-root {
+    max-width: 100%;
+  }
+
+  .MuiPaper-root {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .MuiContainer-root {
+    max-width: 100% !important;
+  }
 }
