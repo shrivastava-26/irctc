@@ -1,0 +1,8 @@
+node_modules
+ui/node_modules
+ui/dist
+cypress/videos
+cypress/screenshots
+artifacts
+.git
+.github
