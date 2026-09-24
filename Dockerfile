@@ -1,5 +1,7 @@
 FROM cypress/included:13.17.0
 
+ENTRYPOINT []
+
 WORKDIR /app
 
 ENV NODE_ENV=production \
