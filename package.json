@@ -12,7 +12,8 @@
     "start-booking-edge": "concurrently \"npm run start-captcha-server\" \"npm run wait-for-captcha-server && cypress run --headed --browser edge --no-exit\"",
     "test": "cypress run --browser chrome --headed",
     "test:edge": "cypress run --browser edge --headed",
-    "open": "cypress open"
+    "open": "cypress open",
+    "postinstall": "npx cypress install"
   },
   "author": "Prince Shrivastava",
   "license": "ISC",
