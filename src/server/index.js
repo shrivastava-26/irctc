@@ -134,7 +134,7 @@ app.post('/credentials', async (req, res) => {
   }
 })
 
-if (require.main === module) {
+if (require.main === module || process.env.RUN_JOB_MANAGER === 'true') {
   app.listen(PORT, '0.0.0.0', () => {
     console.log('[Job Manager] Listening on http://0.0.0.0:' + PORT)
   })

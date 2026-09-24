@@ -7,6 +7,7 @@ const path = require('path')
 const publicPort = Number(process.env.PORT || 10000)
 
 process.env.PORT = '3001'
+process.env.RUN_JOB_MANAGER = 'false'
 require('./src/server/index.js')
 
 const app = express()
