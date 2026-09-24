@@ -15,15 +15,15 @@ describe('IRCTC — Booking Flow (stops at payment)', () => {
     if (Cypress.env('IRCTC_RUN_AUTH_FLOW') !== true) {
       this.skip();
     }
+    cy.fixture('booking').then((data) => {
+      booking = data;
+    });
   });
 
   beforeEach(function () {
     if (Cypress.env('IRCTC_RUN_AUTH_FLOW') !== true) {
       this.skip();
     }
-    cy.fixture('booking').then((data) => {
-      booking = data;
-    });
   });
 
   // --------------------------------------------------------------------------

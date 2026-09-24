@@ -131,7 +131,6 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
           })}
         </Box>
 
-        {/* Success/Error Area */}
         {activeJob?.status === 'COMPLETED' && (
           <Box sx={{ mb: 2, p: 1.5, bgcolor: '#e8f5e9', borderRadius: 1 }}>
             <Typography variant="subtitle2" color="success.dark">✓ BOOKING CONFIRMED</Typography>
@@ -151,7 +150,6 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
           </Box>
         )}
 
-        {/* Live Logs */}
         <Typography variant="caption" fontWeight="bold" sx={{ display: 'block', mb: 0.5 }}>LIVE LOG</Typography>
         <Paper 
           variant="outlined" 
@@ -179,7 +177,6 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
           <div ref={logsEndRef} />
         </Paper>
 
-        {/* Queue List if multiple */}
         {jobsData.length > 1 && (
           <>
             <Divider sx={{ my: 1.5 }} />

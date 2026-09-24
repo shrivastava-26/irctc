@@ -32,19 +32,77 @@ Train search, quota selection, passenger data, and payment handoff have no verif
 
 ## Run
 
+Install dependencies once:
+
 ```powershell
 npm install
-npm run validate
-npm run test:headed
 ```
 
-To test login after independently confirming the current DOM and supplying credentials locally (never commit them):
+Entry validation only — visits the live entry page and classifies its state, no
+credentials required:
+
+```powershell
+npx cypress run --headed --browser chrome --spec "cypress/e2e/irctc-entry.cy.js"
+```
+
+Headed execution of the full spec suite as Cypress discovers it (`cypress/e2e/**/*.cy.js`).
+`irctc.cy.js` always runs (it performs a real login using `USERNAME`/`PASSWORD`
+Cypress env vars); the other four specs skip themselves unless
+`IRCTC_RUN_AUTH_FLOW=true` is set:
+
+```powershell
+npm test
+```
+
+Guarded authentication flow — supply credentials locally (never commit them) and
+opt in explicitly:
 
 ```powershell
 $env:CYPRESS_IRCTC_RUN_AUTH_FLOW = 'true'
 $env:CYPRESS_IRCTC_USERNAME = '...'
 $env:CYPRESS_IRCTC_PASSWORD = '...'
-npm run test:headed
+npx cypress run --headed --browser chrome --spec "cypress/e2e/irctc-login.cy.js"
 ```
 
-The test does not include ticket, passenger, UPI, OTP, or payment automation.
+Full configured automation (search → select → passenger form → payment boundary,
+stops before paying) once the guarded login flow above has been independently
+verified:
+
+```powershell
+$env:CYPRESS_IRCTC_RUN_AUTH_FLOW = 'true'
+$env:CYPRESS_IRCTC_USERNAME = '...'
+$env:CYPRESS_IRCTC_PASSWORD = '...'
+npx cypress run --headed --browser chrome --spec "cypress/e2e/irctc-booking-flow.cy.js"
+```
+
+Job-manager + React UI (starts the CAPTCHA OCR server, the job-manager API, and
+the UI dev server together):
+
+```powershell
+npm run start-ui
+```
+
+None of the flows above include ticket payment automation — every path stops at
+CAPTCHA, OTP, or the payment boundary for a human to complete.
+
+### Troubleshooting
+
+- **Every spec fails immediately with a module-resolution error mentioning
+  `mock-boundary`**: `cypress/support/mock-boundary.js` is an optional,
+  gitignored, developer-local file (see `.gitignore`) — it is never imported
+  unconditionally. If you have a local copy, load it from your own local setup
+  rather than `cypress/support/e2e.js`.
+- **`cy.<commandName> is not a function`**: confirm the command is defined in
+  `cypress/support/commands.js` (`grep "Cypress.Commands.add" cypress/support/commands.js`)
+  and that `cypress/support/e2e.js` still imports `./commands`.
+- **Login/search/booking specs report "skipped"**: they require
+  `IRCTC_RUN_AUTH_FLOW=true` (via `CYPRESS_IRCTC_RUN_AUTH_FLOW=true` or
+  `cypress.env.json`) plus `IRCTC_USERNAME`/`IRCTC_PASSWORD` — this is
+  intentional; they never run unattended.
+- **CAPTCHA OCR requests fail**: the Python OCR server must be running first
+  (`npm run start-captcha-server`, then wait for `npm run wait-for-captcha-server`
+  or the `/health` endpoint) before any flow that calls `submitCaptcha`/`solveCaptcha`.
+- **Browser gets blocked or times out (WAF)**: always run headed
+  (`--headed --browser chrome`), never headless — this repo intentionally
+  strips the `--headless` flag in `cypress.config.js` because IRCTC's WAF
+  blocks headless/Electron fingerprints.

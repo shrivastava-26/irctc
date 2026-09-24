@@ -73,6 +73,12 @@ module.exports = defineConfig({
 
           return null
         },
+        // Used by cypress/support/commands.js: visitIrctcEntry / reportCurrentIrctcState.
+        // Logs non-sensitive page-state facts only — never credentials or payment data.
+        reportIrctcState(state) {
+          console.log('[IRCTC-STATE]', JSON.stringify(state))
+          return null
+        },
       })
 
       // Remove --headless flag so IRCTC WAF doesn't fingerprint and block the browser.
