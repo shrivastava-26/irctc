@@ -81,18 +81,19 @@ module.exports = defineConfig({
         },
       })
 
-      // Remove --headless flag so IRCTC WAF doesn't fingerprint and block the browser.
-      // This is the primary fix for ESOCKETTIMEDOUT in headless CI.
+      // Keep browser flags compatible with both the hosted Linux runner and local Edge.
+      // Headless mode is allowed on Render; local runs can opt into headed execution
+      // with CYPRESS_HEADED=true.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium') {
-          launchOptions.args = launchOptions.args.filter(
-            (arg) => !arg.includes('--headless'),
-          )
           launchOptions.args.push('--disable-blink-features=AutomationControlled')
           launchOptions.args.push('--no-sandbox')
           launchOptions.args.push('--disable-web-security')
           launchOptions.args.push('--window-size=1478,1056')
-          launchOptions.args.push('--start-maximized')
+
+          if (process.env.CYPRESS_HEADED === 'true') {
+            launchOptions.args.push('--start-maximized')
+          }
         }
         return launchOptions
       })
