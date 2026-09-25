@@ -8,24 +8,25 @@ import BookTab from './components/BookTab'
 import AccountsTab from './components/AccountsTab'
 import JourneysTab from './components/JourneysTab'
 import JobsTab from './components/JobsTab'
+import AutomationDialog from './components/AutomationDialog'
 import {
-  buildJob,
   loadAccounts,
-  loadJobs,
   loadJourneys,
   loadSelectedAccount,
   saveAccounts,
-  saveJobs,
   saveJourneys,
   saveSelectedAccount,
 } from './storage'
+
+const API = '/api'
 
 export default function App() {
   const [tab, setTab] = useState('book')
   const [accounts, setAccounts] = useState([])
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [journeys, setJourneys] = useState([])
-  const [jobs, setJobs] = useState([])
+  const [activeJobs, setActiveJobs] = useState([])
+  const [showAutomationDialog, setShowAutomationDialog] = useState(false)
 
   useEffect(() => {
     const loadedAccounts = loadAccounts().map(account => ({
@@ -34,11 +35,9 @@ export default function App() {
       password: account.password || '',
     }))
     const loadedJourneys = loadJourneys()
-    const loadedJobs = loadJobs()
 
     setAccounts(loadedAccounts)
     setJourneys(loadedJourneys)
-    setJobs(loadedJobs)
 
     const storedSelected = loadSelectedAccount()
     const validSelected = loadedAccounts.some(account => account.id === storedSelected)
@@ -77,11 +76,11 @@ export default function App() {
     saveJourneys(nextJourneys)
   }
 
-  const startAutomation = () => {
-    const account = accounts.find(item => item.id === selectedAccountId)
+  const startAutomation = async () => {
+    const account = accounts.find(item => String(item.id) === String(selectedAccountId))
 
     if (!account) {
-      toast.error('Please add/select an IRCTC account first.')
+      toast.error('Please select an IRCTC account first.')
       return
     }
 
@@ -91,27 +90,94 @@ export default function App() {
     }
 
     if (journeys.length === 0) {
-      toast.error('No journeys available to prepare.')
+      toast.error('No journeys available to run.')
       return
     }
 
-    const newJobs = journeys.map(journey => buildJob(account, journey))
-    const nextJobs = jobs.concat(newJobs)
+    // Keep the existing execution business logic: credentials are registered
+    // for the active runner session immediately before jobs are created.
+    try {
+      const credentialResponse = await fetch(API + '/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountName: account.username.trim(),
+          password: account.password,
+        }),
+      })
 
-    setJobs(nextJobs)
-    saveJobs(nextJobs)
+      let credentialData = {}
+      try {
+        credentialData = await credentialResponse.json()
+      } catch {
+        // handled by status below
+      }
 
-    toast.success(
-      newJobs.length === 1
-        ? 'Automation job saved locally'
-        : newJobs.length + ' automation jobs saved locally',
-    )
-    setTab('jobs')
-  }
+      if (!credentialResponse.ok) {
+        throw new Error(credentialData.error || 'Failed to register credentials')
+      }
+    } catch (err) {
+      toast.error('Credential Error: ' + err.message)
+      return
+    }
 
-  const saveJobList = (nextJobs) => {
-    setJobs(nextJobs)
-    saveJobs(nextJobs)
+    const newJobIds = []
+    let started = 0
+
+    for (const journey of journeys) {
+      const payload = {
+        credentialsReference: account.username,
+        source: String(journey.source || '').toUpperCase(),
+        destination: String(journey.destination || '').toUpperCase(),
+        travelDate: journey.travelDate || '',
+        quota: journey.quota,
+        trainNumber: journey.trainNumber,
+        coach: String(journey.coach || '').toUpperCase(),
+        boardingStation: journey.boardingStation
+          ? String(journey.boardingStation).toUpperCase()
+          : undefined,
+        passengers: journey.passengers,
+        paymentPreference: {
+          method: 'UPI',
+          upiId: journey.upiId,
+        },
+        executionMode: journey.executionMode,
+        scheduledAt: journey.executionMode === 'SCHEDULED' ? journey.scheduledAt : undefined,
+        isMock: journey.isMock,
+        browser: 'edge',
+      }
+
+      try {
+        const res = await fetch(API + '/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        let data = {}
+        try {
+          data = await res.json()
+        } catch {
+          // handled by status below
+        }
+
+        if (!res.ok) {
+          toast.error('Failed: ' + (data.error || 'Job creation failed'))
+          continue
+        }
+
+        newJobIds.push(data.id)
+        started += 1
+      } catch (err) {
+        toast.error('Error: ' + err.message)
+      }
+    }
+
+    if (newJobIds.length > 0) {
+      toast.success('Started ' + started + ' automation job(s)')
+      setActiveJobs(prev => prev.concat(newJobIds))
+      setShowAutomationDialog(true)
+    }
   }
 
   return (
@@ -140,7 +206,8 @@ export default function App() {
             selectedAccountId={selectedAccountId}
             journeys={journeys}
             onStart={startAutomation}
-            activeJobsCount={jobs.filter(job => job.status === 'READY').length}
+            activeJobsCount={activeJobs.length}
+            onOpenDialog={() => setShowAutomationDialog(true)}
           />
         )}
 
@@ -157,9 +224,7 @@ export default function App() {
           <JourneysTab journeys={journeys} onSave={handleJourneysSave} />
         )}
 
-        {tab === 'jobs' && (
-          <JobsTab jobs={jobs} onSave={saveJobList} />
-        )}
+        {tab === 'jobs' && <JobsTab />}
       </Container>
 
       <Box sx={{
@@ -171,7 +236,7 @@ export default function App() {
         fontSize: { xs: '0.62rem', sm: '0.72rem' },
         lineHeight: 1.4,
       }}>
-        IRCTC Automation MVP © {new Date().getFullYear()} — browser-local data
+        IRCTC Automation Client © {new Date().getFullYear()} — browser-local account data
       </Box>
 
       <ToastContainer
@@ -180,6 +245,16 @@ export default function App() {
         hideProgressBar
         theme="colored"
         limit={3}
+      />
+
+      <AutomationDialog
+        open={showAutomationDialog}
+        activeJobs={activeJobs}
+        onClose={() => setShowAutomationDialog(false)}
+        onAddJourney={() => {
+          setShowAutomationDialog(false)
+          setTab('journeys')
+        }}
       />
     </Box>
   )
