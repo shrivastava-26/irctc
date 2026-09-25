@@ -4,6 +4,7 @@ const path = require('path')
 
 const root = path.join(process.cwd(), 'ui', 'dist')
 const port = Number(process.env.PORT || 10000)
+const runnerUrl = process.env.AUTOMATION_RUNNER_URL || ''
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -28,10 +29,58 @@ function safeFile(requestUrl) {
   return path.join(root, 'index.html')
 }
 
+function proxyApi(req, res) {
+  if (!runnerUrl) {
+    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({
+      error: 'Automation runner is not configured',
+    }))
+    return
+  }
+
+  const target = new URL(req.url || '/', runnerUrl)
+  const proxy = http.request(target, {
+    method: req.method,
+    headers: {
+      ...req.headers,
+      host: target.host,
+      connection: 'close',
+    },
+  }, upstream => {
+    res.statusCode = upstream.statusCode || 502
+    Object.entries(upstream.headers).forEach(([name, value]) => {
+      if (value !== undefined) res.setHeader(name, value)
+    })
+    upstream.pipe(res)
+  })
+
+  proxy.on('error', err => {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({
+        error: 'Automation runner unavailable',
+        details: err.message,
+      }))
+    }
+  })
+
+  req.pipe(proxy)
+}
+
 const server = http.createServer((req, res) => {
+  if (req.url && req.url.startsWith('/api')) {
+    return proxyApi({
+      ...req,
+      url: req.url.slice(4) || '/',
+    }, res)
+  }
+
   if (req.url && req.url.startsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ status: 'ok', mode: 'frontend-only-mvp' }))
+    res.end(JSON.stringify({
+      status: 'ok',
+      mode: runnerUrl ? 'frontend-with-automation-runner' : 'frontend-only-mvp',
+    }))
     return
   }
 
@@ -59,5 +108,5 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(port, '0.0.0.0', () => {
-  console.log('[MVP] Static web host listening on 0.0.0.0:' + port)
+  console.log('[MVP] Web host listening on 0.0.0.0:' + port)
 })
