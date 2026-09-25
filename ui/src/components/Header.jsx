@@ -1,6 +1,5 @@
 import React from 'react'
 import { AppBar, Box, Button, Container, Toolbar, Typography } from '@mui/material'
-import TrainIcon from '@mui/icons-material/Train'
 
 export default function Header({ tab, setTab }) {
   const tabs = [
@@ -27,8 +26,6 @@ export default function Header({ tab, setTab }) {
             overflow: 'hidden',
           }}
         >
-          <TrainIcon sx={{ flexShrink: 0, fontSize: { xs: '1.35rem', sm: '1.5rem' } }} />
-
           <Typography
             component="div"
             sx={{
@@ -39,7 +36,7 @@ export default function Header({ tab, setTab }) {
               mr: 0.5,
             }}
           >
-            IRCTC AUTOMATION
+            SIVA
           </Typography>
 
           <Typography
@@ -52,7 +49,7 @@ export default function Header({ tab, setTab }) {
               mr: 0.25,
             }}
           >
-            IRCTC
+            SIVA
           </Typography>
 
           <Box
