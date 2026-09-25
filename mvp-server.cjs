@@ -1,4 +1,5 @@
 const http = require('http')
+const https = require('https')
 const fs = require('fs')
 const path = require('path')
 
@@ -38,8 +39,20 @@ function proxyApi(req, res) {
     return
   }
 
-  const target = new URL(req.url || '/', runnerUrl)
-  const proxy = http.request(target, {
+  let target
+  try {
+    target = new URL(req.url.slice(4) || '/', runnerUrl)
+  } catch (err) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({
+      error: 'Invalid automation runner URL',
+      details: err.message,
+    }))
+    return
+  }
+
+  const client = target.protocol === 'https:' ? https : http
+  const proxy = client.request(target, {
     method: req.method,
     headers: {
       ...req.headers,
@@ -48,9 +61,11 @@ function proxyApi(req, res) {
     },
   }, upstream => {
     res.statusCode = upstream.statusCode || 502
+
     Object.entries(upstream.headers).forEach(([name, value]) => {
       if (value !== undefined) res.setHeader(name, value)
     })
+
     upstream.pipe(res)
   })
 
@@ -69,10 +84,7 @@ function proxyApi(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.url && req.url.startsWith('/api')) {
-    return proxyApi({
-      ...req,
-      url: req.url.slice(4) || '/',
-    }, res)
+    return proxyApi(req, res)
   }
 
   if (req.url && req.url.startsWith('/health')) {
