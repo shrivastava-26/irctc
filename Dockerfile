@@ -8,7 +8,8 @@ ENV NODE_ENV=production \
     CI=1 \
     DBUS_SESSION_BUS_ADDRESS=/dev/null \
     CYPRESS_HEADED=false \
-    CYPRESS_BROWSER=chrome
+    CYPRESS_BROWSER=chrome \
+    CYPRESS_INSTALL_BINARY=0
 
 COPY package*.json ./
 RUN npm install --include=dev
