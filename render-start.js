@@ -8,7 +8,11 @@ const publicPort = Number(process.env.PORT || 10000)
 
 process.env.PORT = '3001'
 process.env.RUN_JOB_MANAGER = 'false'
-require('./src/server/index.js')
+const jobManagerApp = require('./src/server/index.js')
+
+jobManagerApp.listen(3001, '127.0.0.1', () => {
+  console.log('[Job Manager] Listening on http://127.0.0.1:3001')
+})
 
 const app = express()
 
