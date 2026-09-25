@@ -1,37 +1,32 @@
-import React, { useEffect, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Typography
+  DialogTitle, Divider, Paper, Stack, Typography
 } from '@mui/material'
-import RefreshIcon from '@mui/icons-material/Refresh'
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import { toast } from 'react-toastify'
 
-const API = '/api'
-
-export default function JobsTab() {
-  const [jobs, setJobs] = useState([])
+export default function JobsTab({ jobs, onSave }) {
   const [selectedJob, setSelectedJob] = useState(null)
 
-  const fetchJobs = async () => {
+  const readyCount = useMemo(
+    () => jobs.filter(job => job.status === 'READY').length,
+    [jobs],
+  )
+
+  const copyJob = async (job) => {
     try {
-      const res = await fetch(API + '/jobs')
-      if (res.ok) setJobs(await res.json())
+      await navigator.clipboard.writeText(JSON.stringify(job, null, 2))
+      toast.success('Job JSON copied')
     } catch {
-      // Ignore transient network errors.
+      toast.error('Clipboard access is unavailable')
     }
   }
 
-  useEffect(() => {
-    fetchJobs()
-  }, [])
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'RUNNING': return 'info'
-      case 'COMPLETED': return 'success'
-      case 'FAILED': return 'error'
-      default: return 'default'
-    }
+  const clearAll = () => {
+    onSave([])
+    toast.success('Local jobs cleared')
   }
 
   return (
@@ -44,97 +39,64 @@ export default function JobsTab() {
         gap: 1,
         mb: 2,
       }}>
-        <Typography variant="h6" color="primary" sx={{
-          fontSize: { xs: '1rem', sm: '1.1rem' },
-          fontWeight: 'bold',
-        }}>
-          AUTOMATION JOBS
-        </Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' }, fontWeight: 'bold' }}>
+            LOCAL AUTOMATION PLANS
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {readyCount} ready · stored in this browser
+          </Typography>
+        </Box>
 
         <Button
-          startIcon={<RefreshIcon />}
-          onClick={fetchJobs}
+          startIcon={<DeleteSweepIcon />}
+          color="error"
           variant="outlined"
           size="small"
+          onClick={clearAll}
+          disabled={jobs.length === 0}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Refresh
+          Clear Jobs
         </Button>
       </Box>
 
-      <TableContainer
-        component={Paper}
-        variant="outlined"
-        sx={{ width: '100%', overflowX: 'auto' }}
-      >
-        <Table size="small" sx={{ minWidth: 760 }}>
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Time</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Train</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Quota</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Stage</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>PNR</TableCell>
-            </TableRow>
-          </TableHead>
+      <Stack spacing={1.25}>
+        {jobs.slice().reverse().map(job => (
+          <Paper key={job.id} variant="outlined" sx={{ p: { xs: 1.25, sm: 1.5 }, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" fontWeight="bold" sx={{ overflowWrap: 'anywhere' }}>
+                  {job.journey?.trainNumber} · {job.journey?.source} → {job.journey?.destination}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {job.journey?.travelDate} · {job.journey?.coach} · {job.journey?.quota}
+                </Typography>
+              </Box>
+              <Chip label={job.status} color="info" size="small" />
+            </Box>
 
-          <TableBody>
-            {jobs.slice().reverse().map(job => {
-              const pnrEvent = (job.progressEvents || []).find(event => event.pnr)
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Account: {job.username}
+            </Typography>
 
-              return (
-                <TableRow
-                  key={job.id}
-                  hover
-                  sx={{ cursor: 'pointer', '& td': { py: 0.5, height: '44px' } }}
-                  onClick={() => setSelectedJob(job)}
-                >
-                  <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
-                    {new Date(job.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </TableCell>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1.25, flexWrap: 'wrap' }}>
+              <Button size="small" startIcon={<ContentCopyIcon />} onClick={() => copyJob(job)} variant="outlined">
+                Copy JSON
+              </Button>
+              <Button size="small" onClick={() => setSelectedJob(job)} variant="text">
+                Details
+              </Button>
+            </Box>
+          </Paper>
+        ))}
 
-                  <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                    {job.request?.source} → {job.request?.destination}
-                  </TableCell>
-
-                  <TableCell sx={{ fontSize: '0.8rem' }}>{job.request?.trainNumber}</TableCell>
-                  <TableCell sx={{ fontSize: '0.8rem' }}>{job.request?.quota}</TableCell>
-
-                  <TableCell>
-                    <Chip
-                      label={job.status}
-                      color={getStatusColor(job.status)}
-                      size="small"
-                      sx={{ fontSize: '0.7rem', height: 20 }}
-                    />
-                  </TableCell>
-
-                  <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                    {job.currentState}
-                  </TableCell>
-
-                  <TableCell sx={{ fontWeight: 'bold', color: 'success.main', fontSize: '0.8rem' }}>
-                    {pnrEvent ? pnrEvent.pnr : '-'}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-
-            {jobs.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  No historical jobs found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+        {jobs.length === 0 && (
+          <Paper variant="outlined" sx={{ py: 4, px: 2, textAlign: 'center', color: 'text.secondary' }}>
+            No local automation plans.
+          </Paper>
+        )}
+      </Stack>
 
       <Dialog
         open={Boolean(selectedJob)}
@@ -152,82 +114,46 @@ export default function JobsTab() {
       >
         {selectedJob && (
           <>
-            <DialogTitle sx={{
-              bgcolor: '#f5f5f5',
-              py: 1.5,
-              px: { xs: 2, sm: 3 },
-            }}>
-              <Typography variant="subtitle1" fontWeight="bold">Job Details</Typography>
-            </DialogTitle>
+            <DialogTitle>Local Automation Plan</DialogTitle>
+            <DialogContent sx={{ overflowX: 'hidden' }}>
+              <Typography variant="caption" color="text.secondary">
+                Prepared {new Date(selectedJob.createdAt).toLocaleString()}
+              </Typography>
 
-            <DialogContent sx={{
-              mt: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              p: { xs: 2, sm: 3 },
-              overflowX: 'hidden',
-            }}>
-              <Box>
-                <Typography variant="caption" fontWeight="bold">REQUEST SUMMARY</Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8f9fa', overflowWrap: 'anywhere' }}>
-                  <Typography variant="body2">
-                    <strong>Route:</strong> {selectedJob.request?.source} → {selectedJob.request?.destination}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Train:</strong> {selectedJob.request?.trainNumber} ({selectedJob.request?.coach}) - {selectedJob.request?.quota}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Date:</strong> {selectedJob.request?.travelDate}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Passengers:</strong> {selectedJob.request?.passengerCount || 0}
-                  </Typography>
-                </Paper>
-              </Box>
+              <Divider sx={{ my: 2 }} />
 
-              <Divider />
-
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" fontWeight="bold" sx={{ mb: 1, display: 'block' }}>
-                  EXECUTION LOGS
+              <Stack spacing={0.75}>
+                <Typography variant="body2"><strong>Account:</strong> {selectedJob.username}</Typography>
+                <Typography variant="body2"><strong>Route:</strong> {selectedJob.journey?.source} → {selectedJob.journey?.destination}</Typography>
+                <Typography variant="body2"><strong>Train:</strong> {selectedJob.journey?.trainNumber}</Typography>
+                <Typography variant="body2"><strong>Date:</strong> {selectedJob.journey?.travelDate}</Typography>
+                <Typography variant="body2"><strong>Class:</strong> {selectedJob.journey?.coach}</Typography>
+                <Typography variant="body2"><strong>Quota:</strong> {selectedJob.journey?.quota}</Typography>
+                <Typography variant="body2"><strong>Passengers:</strong> {selectedJob.journey?.passengers?.length || 0}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  This MVP stores the plan locally; it does not report a server-side browser run.
                 </Typography>
+              </Stack>
 
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    height: { xs: 220, sm: 280 },
-                    overflowY: 'auto',
-                    bgcolor: '#1e1e1e',
-                    color: '#d4d4d4',
-                    p: 1.5,
-                    fontFamily: 'Consolas, Monaco, monospace',
-                    fontSize: '0.75rem',
-                    overflowWrap: 'anywhere',
-                  }}
-                >
-                  {(selectedJob.progressEvents || []).map((event, index) => (
-                    <Box key={index} sx={{ display: 'flex', gap: 1.5, py: 0.2 }}>
-                      <Box sx={{
-                        color: '#858585',
-                        flexShrink: 0,
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </Box>
-                      <Box sx={{ color: '#ce9178', wordBreak: 'break-word', minWidth: 0 }}>
-                        {event.message || event.jobStatus || event.state}
-                      </Box>
-                    </Box>
-                  ))}
-                </Paper>
-              </Box>
+              <Paper
+                variant="outlined"
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  bgcolor: '#1e1e1e',
+                  color: '#d4d4d4',
+                  fontFamily: 'Consolas, Monaco, monospace',
+                  fontSize: '0.75rem',
+                  whiteSpace: 'pre-wrap',
+                  overflowX: 'auto',
+                }}
+              >
+                {JSON.stringify(selectedJob, null, 2)}
+              </Paper>
             </DialogContent>
 
             <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2 }}>
-              <Button onClick={() => setSelectedJob(null)} variant="outlined" size="small">
-                Close
-              </Button>
+              <Button onClick={() => setSelectedJob(null)}>Close</Button>
             </DialogActions>
           </>
         )}

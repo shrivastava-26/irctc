@@ -8,138 +8,110 @@ import BookTab from './components/BookTab'
 import AccountsTab from './components/AccountsTab'
 import JourneysTab from './components/JourneysTab'
 import JobsTab from './components/JobsTab'
-import AutomationDialog from './components/AutomationDialog'
-
-const API = '/api'
+import {
+  buildJob,
+  loadAccounts,
+  loadJobs,
+  loadJourneys,
+  loadSelectedAccount,
+  saveAccounts,
+  saveJobs,
+  saveJourneys,
+  saveSelectedAccount,
+} from './storage'
 
 export default function App() {
   const [tab, setTab] = useState('book')
   const [accounts, setAccounts] = useState([])
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [journeys, setJourneys] = useState([])
-  const [activeJobs, setActiveJobs] = useState([])
-  const [showAutomationDialog, setShowAutomationDialog] = useState(false)
+  const [jobs, setJobs] = useState([])
 
   useEffect(() => {
-    try {
-      const savedAccs = JSON.parse(localStorage.getItem('irctc_accounts') || '[]')
-      const safeSavedAccs = savedAccs.map(({ password, ...account }) => account)
-      setAccounts(safeSavedAccs)
+    const loadedAccounts = loadAccounts().map(account => ({
+      ...account,
+      id: String(account.id),
+      password: account.password || '',
+    }))
+    const loadedJourneys = loadJourneys()
+    const loadedJobs = loadJobs()
 
-      if (safeSavedAccs.length !== savedAccs.length ||
-          savedAccs.some(account => Object.prototype.hasOwnProperty.call(account, 'password'))) {
-        localStorage.setItem('irctc_accounts', JSON.stringify(safeSavedAccs))
-      }
+    setAccounts(loadedAccounts)
+    setJourneys(loadedJourneys)
+    setJobs(loadedJobs)
 
-      const selected = localStorage.getItem('irctc_selected_account')
-      if (selected && safeSavedAccs.some(account => account.id === selected)) {
-        setSelectedAccountId(selected)
-      } else if (safeSavedAccs.length > 0) {
-        setSelectedAccountId(safeSavedAccs[0].id)
-      }
+    const storedSelected = loadSelectedAccount()
+    const validSelected = loadedAccounts.some(account => account.id === storedSelected)
+      ? storedSelected
+      : (loadedAccounts[0]?.id || '')
 
-      const savedJourneys = JSON.parse(localStorage.getItem('irctc_journeys') || '[]')
-      setJourneys(savedJourneys)
-    } catch {
-      // Ignore malformed browser state.
-    }
+    setSelectedAccountId(validSelected)
+    if (validSelected) saveSelectedAccount(validSelected)
   }, [])
 
-  const saveAccounts = (newAccounts) => {
-    setAccounts(newAccounts)
+  const handleAccountsSave = (nextAccounts) => {
+    setAccounts(nextAccounts)
+    saveAccounts(nextAccounts)
 
-    const safeAccounts = newAccounts.map(({ password, ...safe }) => safe)
-    localStorage.setItem('irctc_accounts', JSON.stringify(safeAccounts))
-
-    if (newAccounts.length === 0) {
+    if (nextAccounts.length === 0) {
       setSelectedAccountId('')
-      localStorage.removeItem('irctc_selected_account')
+      saveSelectedAccount('')
       return
     }
 
-    if (!newAccounts.some(account => account.id === selectedAccountId)) {
-      const nextId = newAccounts[0].id
+    if (!nextAccounts.some(account => account.id === selectedAccountId)) {
+      const nextId = nextAccounts[0].id
       setSelectedAccountId(nextId)
-      localStorage.setItem('irctc_selected_account', nextId)
+      saveSelectedAccount(nextId)
     }
   }
 
   const selectAccount = (id) => {
     setSelectedAccountId(id)
-    localStorage.setItem('irctc_selected_account', id)
+    saveSelectedAccount(id)
     toast.success('Account selected')
   }
 
-  const saveJourneys = (newJourneys) => {
-    setJourneys(newJourneys)
-    localStorage.setItem('irctc_journeys', JSON.stringify(newJourneys))
+  const handleJourneysSave = (nextJourneys) => {
+    setJourneys(nextJourneys)
+    saveJourneys(nextJourneys)
   }
 
-  const startAutomation = async () => {
+  const startAutomation = () => {
     const account = accounts.find(item => item.id === selectedAccountId)
 
     if (!account) {
-      toast.error('Please select an IRCTC account first.')
+      toast.error('Please add/select an IRCTC account first.')
+      return
+    }
+
+    if (!account.password) {
+      toast.error('This account has no password saved. Edit it and save the password.')
       return
     }
 
     if (journeys.length === 0) {
-      toast.error('No journeys available to run.')
+      toast.error('No journeys available to prepare.')
       return
     }
 
-    const newJobIds = []
-    let started = 0
+    const newJobs = journeys.map(journey => buildJob(account, journey))
+    const nextJobs = jobs.concat(newJobs)
 
-    for (const journey of journeys) {
-      const payload = {
-        credentialsReference: account.username,
-        source: String(journey.source || '').toUpperCase(),
-        destination: String(journey.destination || '').toUpperCase(),
-        travelDate: journey.travelDate || '',
-        quota: journey.quota,
-        trainNumber: journey.trainNumber,
-        coach: String(journey.coach || '').toUpperCase(),
-        boardingStation: journey.boardingStation
-          ? String(journey.boardingStation).toUpperCase()
-          : undefined,
-        passengers: journey.passengers,
-        paymentPreference: {
-          method: 'UPI',
-          upiId: journey.upiId,
-        },
-        executionMode: journey.executionMode,
-        scheduledAt: journey.executionMode === 'SCHEDULED' ? journey.scheduledAt : undefined,
-        isMock: journey.isMock,
-        browser: 'edge',
-      }
+    setJobs(nextJobs)
+    saveJobs(nextJobs)
 
-      try {
-        const res = await fetch(API + '/jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
+    toast.success(
+      newJobs.length === 1
+        ? 'Automation job saved locally'
+        : newJobs.length + ' automation jobs saved locally',
+    )
+    setTab('jobs')
+  }
 
-        const data = await res.json()
-
-        if (!res.ok) {
-          toast.error('Failed: ' + (data.error || 'Job creation failed'))
-          continue
-        }
-
-        newJobIds.push(data.id)
-        started += 1
-      } catch (err) {
-        toast.error('Error: ' + err.message)
-      }
-    }
-
-    if (newJobIds.length > 0) {
-      toast.success('Started ' + started + ' automation job(s)')
-      setActiveJobs(prev => prev.concat(newJobIds))
-      setShowAutomationDialog(true)
-    }
+  const saveJobList = (nextJobs) => {
+    setJobs(nextJobs)
+    saveJobs(nextJobs)
   }
 
   return (
@@ -168,8 +140,7 @@ export default function App() {
             selectedAccountId={selectedAccountId}
             journeys={journeys}
             onStart={startAutomation}
-            activeJobsCount={activeJobs.length}
-            onOpenDialog={() => setShowAutomationDialog(true)}
+            activeJobsCount={jobs.filter(job => job.status === 'READY').length}
           />
         )}
 
@@ -177,16 +148,18 @@ export default function App() {
           <AccountsTab
             accounts={accounts}
             selectedAccountId={selectedAccountId}
-            onSave={saveAccounts}
+            onSave={handleAccountsSave}
             onSelect={selectAccount}
           />
         )}
 
         {tab === 'journeys' && (
-          <JourneysTab journeys={journeys} onSave={saveJourneys} />
+          <JourneysTab journeys={journeys} onSave={handleJourneysSave} />
         )}
 
-        {tab === 'jobs' && <JobsTab />}
+        {tab === 'jobs' && (
+          <JobsTab jobs={jobs} onSave={saveJobList} />
+        )}
       </Container>
 
       <Box sx={{
@@ -198,7 +171,7 @@ export default function App() {
         fontSize: { xs: '0.62rem', sm: '0.72rem' },
         lineHeight: 1.4,
       }}>
-        IRCTC Automation Client © {new Date().getFullYear()} — Personal Web / Desktop Client
+        IRCTC Automation MVP © {new Date().getFullYear()} — browser-local data
       </Box>
 
       <ToastContainer
@@ -207,16 +180,6 @@ export default function App() {
         hideProgressBar
         theme="colored"
         limit={3}
-      />
-
-      <AutomationDialog
-        open={showAutomationDialog}
-        activeJobs={activeJobs}
-        onClose={() => setShowAutomationDialog(false)}
-        onAddJourney={() => {
-          setShowAutomationDialog(false)
-          setTab('journeys')
-        }}
       />
     </Box>
   )

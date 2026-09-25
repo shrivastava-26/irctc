@@ -21,17 +21,11 @@ body {
   box-sizing: border-box;
 }
 
-img,
-svg,
-video,
-canvas {
+img, svg, video, canvas {
   max-width: 100%;
 }
 
-button,
-input,
-textarea,
-select {
+button, input, textarea, select {
   font: inherit;
 }
 
@@ -58,11 +52,5 @@ select {
 
   .MuiPaper-root {
     max-width: 100%;
-  }
-}
-
-@media (min-width: 601px) and (max-width: 900px) {
-  .MuiContainer-root {
-    max-width: 100% !important;
   }
 }
