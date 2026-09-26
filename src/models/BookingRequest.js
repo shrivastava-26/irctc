@@ -105,6 +105,8 @@ function validate(data) {
 }
 
 function normalize(data) {
+  const selectionPolicy = String(data.trainSelectionPolicy || 'FIRST_VALID').toUpperCase()
+
   return {
     credentialsReference: data.credentialsReference,
     entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
