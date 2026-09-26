@@ -44,7 +44,7 @@ export default function JobsTab() {
         gap: 1,
         mb: 2,
       }}>
-        <Typography variant="h6" color="primary" sx={{
+        <Typography className="railx-kicker" sx={{
           fontSize: { xs: '1rem', sm: '1.1rem' },
           fontWeight: 'bold',
         }}>
@@ -64,6 +64,7 @@ export default function JobsTab() {
 
       <TableContainer
         component={Paper}
+        className="railx-table-wrap"
         variant="outlined"
         sx={{ width: '100%', overflowX: 'auto' }}
       >
