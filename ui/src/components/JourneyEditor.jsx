@@ -11,6 +11,8 @@ import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
+import StationAutocomplete from './StationAutocomplete'
+import TrainSelector from './TrainSelector'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 
 dayjs.extend(customParseFormat)
@@ -36,6 +38,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
         travelDate: null,
         quota: 'GENERAL',
         trainNumber: '',
+        manualTrainNumber: '',
         trainSelectionPolicy: 'FIRST_VALID',
         preferredTrains: [],
         backupTrains: [],
@@ -87,6 +90,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
       preferredTrains: csv(data.preferredTrains),
       backupTrains: csv(data.backupTrains),
       id: initialData && initialData.id ? initialData.id : Date.now().toString(),
+      manualTrainNumber: undefined,
     }))
   }
 
@@ -152,7 +156,36 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
             <Controller name="trainNumber" control={control} rules={{
               validate: value => watch('trainSelectionPolicy') !== 'FIXED' || String(value || '').trim() ? true : 'Required for Fixed Train',
             }} render={({ field }) => (
-              <TextField {...field} label="Train No" fullWidth error={!!errors.trainNumber} placeholder="12952 (optional)" />
+              <TrainSelector
+                value={field.value}
+                onChange={(trainNumber) => {
+                  field.onChange(trainNumber)
+                  setValue('trainSelectionPolicy', trainNumber ? 'FIXED' : 'FIRST_VALID')
+                }}
+                from={watch('source')}
+                to={watch('destination')}
+                travelDate={watch('travelDate')}
+                travelClass={watch('coach')}
+              />
+            )} />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Controller name="manualTrainNumber" control={control} render={({ field }) => (
+              <TextField
+                {...field}
+                label="Manual Train No"
+                fullWidth
+                placeholder="5-digit train number"
+                onChange={(event) => {
+                  const value = event.target.value.replace(/\\D/g, '').slice(0, 5)
+                  field.onChange(value)
+                  if (value.length === 5) {
+                    setValue('trainNumber', value)
+                    setValue('trainSelectionPolicy', 'FIXED')
+                  }
+                }}
+                helperText="Fallback when train search is unavailable"
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={3}>
