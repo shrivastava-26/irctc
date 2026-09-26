@@ -592,9 +592,6 @@ export default function JourneyEditor({
                 />
               </Grid>
             </Grid>
-
-              
-            </Grid>
           </AccordionDetails>
         </Accordion>
 
