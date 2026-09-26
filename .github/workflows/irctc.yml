@@ -50,6 +50,32 @@ jobs:
       - name: Verify legacy Cypress package
         run: node -e "console.log(require.resolve('cypress/package.json'))"
 
+  browser-compatibility:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium chrome msedge
+      - name: Smoke Chromium
+        env:
+          BROWSER_CHANNEL: chromium
+        run: node tests/browser/playwright.smoke.js
+      - name: Smoke Google Chrome
+        env:
+          BROWSER_CHANNEL: chrome
+        run: node tests/browser/playwright.smoke.js
+      - name: Smoke Microsoft Edge
+        env:
+          BROWSER_CHANNEL: msedge
+        run: node tests/browser/playwright.smoke.js
+
   live-booking:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
