@@ -4,7 +4,7 @@ const test = require('node:test')
 const BookingRequest = require('../../src/models/BookingRequest')
 const sessionManager = require('../../src/engine/irctc/sessionManager')
 
-test('live booking defaults to LOCAL execution and auto browser selection', () => {
+test('new booking defaults to API execution and auto browser selection remains available for LOCAL jobs', () => {
   const request = BookingRequest.normalize({
     credentialsReference: 'primary',
     source: 'BTH',
@@ -14,7 +14,7 @@ test('live booking defaults to LOCAL execution and auto browser selection', () =
     passengers: [{ name: 'Test User', age: 30, gender: 'Male' }],
   })
 
-  assert.equal(request.executionTarget, 'LOCAL')
+  assert.equal(request.executionTarget, 'API')
   assert.equal(request.browser, 'auto')
 })
 
