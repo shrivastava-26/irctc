@@ -70,7 +70,7 @@ test('booking request supports Auto surface and FIRST_VALID without a train numb
   assert.equal(normalized.trainNumber, null)
 })
 
-const { selectedTrainEntries: explicitSelectedTrainEntries, orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
+const { selectedTrainEntries: explicitSelectedTrainEntries } = require('../../src/engine/irctc/selection')
 const { normalizePassengerValue, passengerIdentityMatches, findMasterPassenger } = require('../../src/engine/irctc/masterPassenger')
 
 test('explicit selected trains are validated, normalized by priority, and exclude unchecked candidates', () => {
