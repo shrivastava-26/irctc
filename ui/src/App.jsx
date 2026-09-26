@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Container } from '@mui/material'
+import { Box } from '@mui/material'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
@@ -104,8 +104,6 @@ export default function App() {
       return
     }
 
-    // Keep the existing execution business logic: credentials are registered
-    // for the active runner session immediately before jobs are created.
     try {
       const credentialResponse = await fetch(API + '/credentials', {
         method: 'POST',
@@ -120,7 +118,6 @@ export default function App() {
       try {
         credentialData = await credentialResponse.json()
       } catch {
-        // handled by status below
       }
 
       if (!credentialResponse.ok) {
@@ -175,7 +172,6 @@ export default function App() {
         try {
           data = await res.json()
         } catch {
-          // handled by status below
         }
 
         if (!res.ok) {
@@ -198,71 +194,59 @@ export default function App() {
   }
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      bgcolor: '#f4f6f8',
-      overflowX: 'hidden',
-    }}>
+    <Box className="railx-shell">
       <Header tab={tab} setTab={setTab} />
 
-      <Container
-        maxWidth="lg"
-        sx={{
-          flexGrow: 1,
-          width: '100%',
-          minWidth: 0,
-          py: { xs: 1, sm: 2, md: 2.5 },
-          px: { xs: 1, sm: 2, md: 3 },
-        }}
-      >
-        {tab === 'book' && (
-          <BookTab
-            accounts={accounts}
-            selectedAccountId={selectedAccountId}
-            journeys={journeys}
-            onStart={startAutomation}
-            selectedJourneyIds={selectedJourneyIds}
-            onSelectionChange={setSelectedJourneyIds}
-            activeJobsCount={activeJobs.length}
-            onOpenDialog={() => setShowAutomationDialog(true)}
-          />
-        )}
+      <main className="railx-main">
+        <Box className="railx-page">
+          {tab === 'book' && (
+            <BookTab
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              journeys={journeys}
+              onStart={startAutomation}
+              selectedJourneyIds={selectedJourneyIds}
+              onSelectionChange={setSelectedJourneyIds}
+              activeJobsCount={activeJobs.length}
+              onOpenDialog={() => setShowAutomationDialog(true)}
+            />
+          )}
 
-        {tab === 'accounts' && (
-          <AccountsTab
-            accounts={accounts}
-            selectedAccountId={selectedAccountId}
-            onSave={handleAccountsSave}
-            onSelect={selectAccount}
-          />
-        )}
+          {tab === 'accounts' && (
+            <AccountsTab
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              onSave={handleAccountsSave}
+              onSelect={selectAccount}
+            />
+          )}
 
-        {tab === 'journeys' && (
-          <JourneysTab journeys={journeys} onSave={handleJourneysSave} />
-        )}
+          {tab === 'journeys' && (
+            <JourneysTab journeys={journeys} onSave={handleJourneysSave} />
+          )}
 
-        {tab === 'jobs' && <JobsTab />}
-      </Container>
+          {tab === 'jobs' && <JobsTab />}
+        </Box>
+      </main>
 
       <Box sx={{
         color: 'text.secondary',
-        p: 1,
         px: 2,
+        pb: 1.5,
+        pt: 0.5,
         textAlign: 'center',
         mt: 'auto',
-        fontSize: { xs: '0.62rem', sm: '0.72rem' },
-        lineHeight: 1.4,
+        fontSize: '0.65rem',
+        letterSpacing: '0.03em',
       }}>
-        IRCTC Automation Client © {new Date().getFullYear()} — browser-local account data
+        RAILX — Railway Automation Control Center © {new Date().getFullYear()} · browser-local account data
       </Box>
 
       <ToastContainer
         position="bottom-right"
         autoClose={3000}
         hideProgressBar
-        theme="colored"
+        theme="dark"
         limit={3}
       />
 
