@@ -34,8 +34,9 @@ function main() {
     request.trainNumber ||
     (Array.isArray(request.preferredTrains) && request.preferredTrains.length) ||
     (Array.isArray(request.backupTrains) && request.backupTrains.length)
+  const firstValid = (request.trainSelectionPolicy || 'FIRST_VALID') === 'FIRST_VALID'
 
-  if (missing.length || !hasTrain || !Array.isArray(request.passengers) || !request.passengers.length) {
+  if (missing.length || (!hasTrain && !firstValid) || !Array.isArray(request.passengers) || !request.passengers.length) {
     fail('Booking request is incomplete: source, destination, travelDate, coach, train selection and passengers are required.')
     return
   }
