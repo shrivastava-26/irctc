@@ -111,9 +111,13 @@ function parseTrainNumber(text) {
 
 function parsePnr(text) {
   const value = String(text || '').replace(/\s+/g, ' ')
-  const labeled = value.match(/\\bPNR\\s*(?:NO|NUMBER)?\\s*[:#-]?\\s*(\\d{10})\\b/i)
+  const labeled = value.match(/\bPNR\s*(?:NO|NUMBER)?\s*[:#-]?\s*(\d{10})\b/i)
+  return labeled ? labeled[1] : null
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^$()|[\]\\]/g, '\\$&')
+}
 module.exports = {
   SURFACES,
   ENTRY_URLS,
