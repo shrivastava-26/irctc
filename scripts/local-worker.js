@@ -74,6 +74,7 @@ function sleep(ms) {
 const pool = new JourneyWorkerPool()
 const running = new Map()
 let stopping = false
+let presenceStopSignal = null
 
 async function claimOne() {
   const body = await requestJson('/worker/claim', {
@@ -86,6 +87,25 @@ async function claimOne() {
     }),
   })
   return body.job || null
+}
+
+async function workerHeartbeatLoop(stopSignal) {
+  while (!stopSignal.stopped) {
+    try {
+      await requestJson('/worker/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify({
+          workerId: WORKER_ID,
+          accountReference: localWorkerAccount(),
+          concurrency: CONCURRENCY,
+          activeJobs: running.size,
+        }),
+      })
+    } catch (error) {
+      console.error('[LOCAL-WORKER] Presence heartbeat failed: ' + error.message)
+    }
+    await sleep(Math.min(HEARTBEAT_MS, 10000))
+  }
 }
 
 async function heartbeatLoop(jobId, stopSignal) {
@@ -201,15 +221,22 @@ async function main() {
   console.log('[LOCAL-WORKER] Account: ' + (localWorkerAccount() || 'credential map'))
   console.log('[LOCAL-WORKER] Concurrency: ' + CONCURRENCY)
 
+  presenceStopSignal = { stopped: false }
+  const presence = workerHeartbeatLoop(presenceStopSignal)
+
   while (!stopping) {
     await fillSlots()
     if (!stopping) await sleep(POLL_MS)
   }
+
+  presenceStopSignal.stopped = true
+  await presence.catch(() => {})
 }
 
 function stop(signal) {
   if (stopping) return
   stopping = true
+  if (presenceStopSignal) presenceStopSignal.stopped = true
   console.log('[LOCAL-WORKER] Received ' + signal + '; finishing active jobs without claiming new work.')
 }
 
