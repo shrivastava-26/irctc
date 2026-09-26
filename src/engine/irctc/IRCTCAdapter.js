@@ -254,55 +254,98 @@ class IRCTCAdapter {
     }
   }
 
+  availabilityProbeLimit() {
+    const configured = Number(process.env.SIVA_MAX_AVAILABILITY_PROBES)
+    if (Number.isInteger(configured) && configured > 0) return Math.min(configured, 8)
+    return String(process.env.RENDER || '').toLowerCase() === 'true' ? 1 : 3
+  }
+
+  async probeCandidate(trainNumber, candidate) {
+    try {
+      const evaluation = await this.inspectAvailability(candidate, { readOnly: true })
+      return { trainNumber, candidate, evaluation, error: null }
+    } catch (error) {
+      return { trainNumber, candidate, evaluation: null, error }
+    }
+  }
+  async chooseSelectedTrain(evaluation, candidate) {
+    this.selected = {
+      trainNumber: evaluation.trainNumber,
+      trainName: evaluation.trainName || null,
+      class: evaluation.class,
+      quota: String(this.request.quota || 'GENERAL').toUpperCase(),
+      availability: evaluation.availability,
+      container: candidate,
+    }
+
+    RunStateStore.save(this.jobId, {
+      metadata: {
+        runtimeSurface: this.runtimeSurface,
+        actualSelectedTrainNumber: this.selected.trainNumber,
+        actualSelectedTrainName: this.selected.trainName,
+        actualSelectedClass: this.selected.class,
+        actualSelectedQuota: this.selected.quota,
+        actualAvailability: this.selected.availability,
+      },
+    })
+    this.emitLog('[TRAIN] Selected ' + this.selected.trainNumber + ' ' + (this.selected.trainName || '') + ' ' + this.selected.class + ' ' + this.selected.availability.status)
+    return this.selected
+  }
+
   async selectTrain() {
     const available = await this.listCandidates()
     if (!available.length) throw new Error('No train candidates found.')
     await this.verifyQuota()
 
-    const ordered = orderedTrainNumbers(this.request, available)
+    const ordered = [...new Set(orderedTrainNumbers(this.request, available).map(String))]
+    const containers = this.trainContainers()
+    const byTrain = new Map(available.map(item => [String(item.trainNumber), containers.nth(item.index)]))
+    const probeLimit = this.availabilityProbeLimit()
     let lastReason = 'no candidate satisfied the request'
 
-    for (const number of ordered) {
-      const candidate = await this.findCandidate(number)
-      if (!candidate) {
-        lastReason = 'train ' + number + ' not found'
-        if (this.request.trainSelectionPolicy === 'FIXED') break
-        continue
+    for (let start = 0; start < ordered.length; start += probeLimit) {
+      const batch = ordered.slice(start, start + probeLimit)
+      const inspected = await Promise.all(batch.map(async number => {
+        const candidate = byTrain.get(String(number))
+        if (!candidate) return { trainNumber: number, candidate: null, evaluation: null, error: null }
+        return this.probeCandidate(number, candidate)
+      }))
+
+      // Preserve configured priority even though the read-only probes complete in parallel.
+      // Any fallback that can click/refresh the page is deliberately serialized here.
+      for (const result of inspected) {
+        if (!result.candidate) {
+          lastReason = 'train ' + result.trainNumber + ' not found'
+          continue
+        }
+
+        if (result.evaluation && pickFirstSatisfied([result.evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
+          return this.chooseSelectedTrain(result.evaluation, result.candidate)
+        }
+
+        if (result.error || result.evaluation?.availability?.status === 'UNKNOWN') {
+          try {
+            const fallback = await this.inspectAvailability(result.candidate)
+            if (pickFirstSatisfied([fallback], this.request.availabilityRequirement, availabilitySatisfies)) {
+              return this.chooseSelectedTrain(fallback, result.candidate)
+            }
+            lastReason = 'train ' + result.trainNumber + ' / ' + this.request.coach + ' returned ' + fallback.availability.status
+          } catch (error) {
+            lastReason = 'train ' + result.trainNumber + ' fallback probe failed: ' + error.message
+          }
+          continue
+        }
+
+        lastReason = result.error
+          ? 'train ' + result.trainNumber + ' probe failed: ' + result.error.message
+          : 'train ' + result.trainNumber + ' / ' + this.request.coach + ' returned ' + (result.evaluation?.availability?.status || 'UNKNOWN')
       }
 
-      const evaluation = await this.inspectAvailability(candidate)
-      if (!pickFirstSatisfied([evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
-        lastReason = 'train ' + number + ' / ' + this.request.coach + ' returned ' + evaluation.availability.status
-        if (this.request.trainSelectionPolicy === 'FIXED') break
-        continue
-      }
-
-      this.selected = {
-        trainNumber: evaluation.trainNumber,
-        trainName: evaluation.trainName || null,
-        class: evaluation.class,
-        quota: String(this.request.quota || 'GENERAL').toUpperCase(),
-        availability: evaluation.availability,
-        container: candidate,
-      }
-
-      RunStateStore.save(this.jobId, {
-        metadata: {
-          runtimeSurface: this.runtimeSurface,
-          actualSelectedTrainNumber: this.selected.trainNumber,
-          actualSelectedTrainName: this.selected.trainName,
-          actualSelectedClass: this.selected.class,
-          actualSelectedQuota: this.selected.quota,
-          actualAvailability: this.selected.availability,
-        },
-      })
-      this.emitLog('[TRAIN] Selected ' + this.selected.trainNumber + ' ' + (this.selected.trainName || '') + ' ' + this.selected.class + ' ' + this.selected.availability.status)
-      return this.selected
+      if (this.request.trainSelectionPolicy === 'FIXED') break
     }
 
     throw new Error('No train satisfied deterministic selection: ' + lastReason)
   }
-
   async verifyAvailability() {
     if (!this.selected) throw new Error('No selected train exists.')
     const evaluation = await this.inspectAvailability(this.selected.container)

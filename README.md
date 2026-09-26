@@ -139,3 +139,17 @@ After search, the engine detects the actual runtime train-list surface. A New en
 ### Playwright browser targets
 
 The production runner supports chromium, chrome, and edge. Playwright 1.63.0 is pinned in package.json/package-lock; the branded Chrome and Edge channels are supported by Playwright.
+## Parallel execution architecture
+
+Production execution uses a bounded JourneyWorkerPool rather than Playwright Test workers. Independent journeys can run concurrently, while AccountMutex prevents two jobs from driving the same persistent Playwright profile at the same time.
+
+Train selection uses bounded read-only probes inside the current search-results page. Probes run concurrently up to SIVA_MAX_AVAILABILITY_PROBES; when a live refresh/action is required, that candidate falls back to the existing sequential inspection path. The transactional SUBMIT -> VERIFY_TRANSACTION path remains single-writer and keeps the existing reconciliation safeguards.
+
+### Concurrency configuration
+
+- SIVA_MAX_CONCURRENT_JOURNEYS: maximum independent journeys in flight. Default: 1 on Render, 2 elsewhere.
+- SIVA_MAX_AVAILABILITY_PROBES: maximum read-only train probes within one journey. Default: 1 on Render, 3 elsewhere.
+- SIVA_MAX_RSS_MB: process RSS safety threshold. Default: 380 MB on Render, 8192 MB elsewhere.
+- SIVA_MIN_AVAILABLE_MEMORY_MB: minimum available memory before admitting another journey. Default: 64 MB on Render, 1024 MB elsewhere.
+
+For a 2 OCPU / 12 GB Oracle Always Free executor, start with SIVA_MAX_CONCURRENT_JOURNEYS=2 and SIVA_MAX_AVAILABILITY_PROBES=2, then tune using telemetry rather than assuming more browser processes are faster.

@@ -121,7 +121,7 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
     await this.detectRuntimeSurface()
   }
 
-  async inspectAvailability(candidate) {
+  async inspectAvailability(candidate, { readOnly = false } = {}) {
     const rawText = (await candidate.innerText()).replace(/\s+/g, ' ')
     const trainNumber = parseTrainNumber(rawText)
     if (!trainNumber) throw new Error('Legacy result has no exact 5-digit train number.')
@@ -138,7 +138,7 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
     let text = await classTile.innerText()
     let availability = normalizeAvailability(text)
 
-    if (availability.status === 'UNKNOWN') {
+    if (!readOnly && availability.status === 'UNKNOWN') {
       await classTile.click()
       await this.page.waitForLoadState('domcontentloaded').catch(() => {})
       text = await classTile.innerText()
