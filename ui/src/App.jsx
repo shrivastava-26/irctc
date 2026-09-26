@@ -128,7 +128,6 @@ export default function App() {
     }
 
     if (!localWorkerOnline) {
-      toast.error('Local browser worker is offline. Start it before automation.')
       return
     }
 
