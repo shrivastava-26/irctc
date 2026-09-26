@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
-import { Box, Paper, Stack, Typography, Button, Checkbox, FormControlLabel, Chip } from '@mui/material'
+import { Box, Paper, Stack, Typography, Button, Checkbox, Chip } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
@@ -168,7 +168,7 @@ export default function BookTab({
                   color: 'success.dark',
                   px: 1,
                   py: 0.55,
-                  bgcolor: 'success.lighter',
+                  bgcolor: 'success.light',
                   borderRadius: 99,
                   flexShrink: 0,
                   alignSelf: { xs: 'flex-start', sm: 'center' },
