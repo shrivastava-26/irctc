@@ -28,6 +28,7 @@ export default function App() {
   const [activeJobs, setActiveJobs] = useState([])
   const [showAutomationDialog, setShowAutomationDialog] = useState(false)
   const [selectedJourneyIds, setSelectedJourneyIds] = useState([])
+  const [localWorkerOnline, setLocalWorkerOnline] = useState(false)
 
   useEffect(() => {
     const loadedAccounts = loadAccounts().map(account => ({
@@ -47,6 +48,28 @@ export default function App() {
 
     setSelectedAccountId(validSelected)
     if (validSelected) saveSelectedAccount(validSelected)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    let timer = null
+
+    const pollWorker = async () => {
+      try {
+        const response = await fetch(API + '/worker/status', { cache: 'no-store' })
+        const data = response.ok ? await response.json() : null
+        if (!cancelled) setLocalWorkerOnline(Boolean(data?.online))
+      } catch {
+        if (!cancelled) setLocalWorkerOnline(false)
+      }
+      if (!cancelled) timer = window.setTimeout(pollWorker, 10000)
+    }
+
+    pollWorker()
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+    }
   }, [])
 
   const handleAccountsSave = (nextAccounts) => {
@@ -187,6 +210,7 @@ export default function App() {
               selectedJourneyIds={selectedJourneyIds}
               onSelectionChange={setSelectedJourneyIds}
               activeJobsCount={activeJobs.length}
+              localWorkerOnline={localWorkerOnline}
               onOpenDialog={() => setShowAutomationDialog(true)}
             />
           )}
