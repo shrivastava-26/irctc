@@ -1,11 +1,15 @@
 import React, { useState } from 'react'
-import { Box, Typography, Button, Paper, Stack, IconButton, Dialog, DialogContent } from '@mui/material'
+import { Box, Typography, Button, Stack, IconButton, Dialog, DialogContent, Tooltip } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import TrainOutlinedIcon from '@mui/icons-material/TrainOutlined'
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import { toast } from 'react-toastify'
 import JourneyEditor from './JourneyEditor'
+import { GlassPanel, StatusBadge } from './RailxPrimitives'
 
 export default function JourneysTab({ journeys, onSave }) {
   const [open, setOpen] = useState(false)
@@ -16,17 +20,17 @@ export default function JourneysTab({ journeys, onSave }) {
     setOpen(true)
   }
 
-  const handleDuplicate = (journey) => {
+  const handleDuplicate = journey => {
     onSave(journeys.concat({ ...journey, id: Date.now().toString() }))
     toast.success('Journey duplicated')
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = id => {
     onSave(journeys.filter(journey => journey.id !== id))
     toast.success('Journey deleted')
   }
 
-  const handleSaveJourney = (data) => {
+  const handleSaveJourney = data => {
     if (editingJourney) {
       onSave(journeys.map(journey => journey.id === data.id ? data : journey))
       toast.success('Journey updated')
@@ -39,57 +43,61 @@ export default function JourneysTab({ journeys, onSave }) {
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexWrap: 'wrap', gap: 1, mb: 2 }}>
-        <Typography className="railx-kicker" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' }, fontWeight: 'bold' }}>
-          PLANNED JOURNEYS
-        </Typography>
+      <GlassPanel className="railx-page-intro">
+        <div className="railx-section-header" style={{ marginBottom: 0 }}>
+          <Box minWidth={0}>
+            <Typography className="railx-kicker">Journeys</Typography>
+            <Typography component="h1" className="railx-section-title">Planned journeys</Typography>
+            <Typography className="railx-section-copy">Saved routes and booking preferences.</Typography>
+          </Box>
+          <Button startIcon={<AddIcon />} variant="contained" color="primary" onClick={() => handleOpen()}>
+            Add journey
+          </Button>
+        </div>
+      </GlassPanel>
 
-        <Button startIcon={<AddIcon />} variant="contained" color="secondary" size="small" onClick={() => handleOpen()} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-          Add Journey
-        </Button>
-      </Box>
+      <section className="railx-section" aria-label="Planned journeys list">
+        {journeys.length > 0 ? (
+          <div className="railx-journey-list">
+            {journeys.map(journey => (
+              <div key={journey.id} className="railx-journey-row">
+                <div className="railx-row-grid">
+                  <Box className="railx-brand-mark" sx={{ color: 'primary.main', flexShrink: 0, width: 38, height: 38 }}>
+                    <TrainOutlinedIcon fontSize="small" />
+                  </Box>
 
-      <Stack spacing={1.25} className="railx-list">
-        {journeys.map(journey => (
-          <Paper key={journey.id} className="railx-list-card" variant="outlined" sx={{
-            p: { xs: 1.25, sm: 1.5 },
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: { xs: 'stretch', sm: 'flex-start' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 1.25,
-            minWidth: 0,
-          }}>
-            <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.9rem', overflowWrap: 'anywhere', lineHeight: 1.5 }}>
-                {journey.trainNumber} · {journey.source} → {journey.destination} · {journey.travelDate}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                {journey.coach} • {journey.quota} • {(journey.passengers && journey.passengers.length) || 0} Passenger(s)
-              </Typography>
-              {(journey.boardingStation || journey.upiId) && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {journey.boardingStation ? 'Boarding: ' + journey.boardingStation : ''}
-                  {journey.boardingStation && journey.upiId ? ' • ' : ''}
-                  {journey.upiId ? 'UPI configured' : ''}
-                </Typography>
-              )}
-            </Box>
+                  <Box minWidth={0}>
+                    <div className="railx-route">
+                      {journey.trainNumber ? journey.trainNumber + ' · ' : ''}{journey.source} → {journey.destination}
+                    </div>
+                    <div className="railx-route-meta">{journey.travelDate} · {journey.coach} · {journey.quota}</div>
+                    <div className="railx-meta-line">
+                      <EventOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
+                      {journey.passengers?.length || 0} passenger{journey.passengers?.length === 1 ? '' : 's'}
+                      <Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>
+                      <PaymentsOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
+                      {journey.upiId ? 'UPI configured' : 'Payment not configured'}
+                      {journey.boardingStation ? <><Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>Boarding {journey.boardingStation}</> : null}
+                    </div>
+                  </Box>
 
-            <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0, justifyContent: { xs: 'flex-end', sm: 'initial' } }}>
-              <IconButton size="small" onClick={() => handleOpen(journey)} title="Edit" aria-label="Edit journey"><EditIcon fontSize="small" /></IconButton>
-              <IconButton size="small" onClick={() => handleDuplicate(journey)} title="Duplicate" aria-label="Duplicate journey"><ContentCopyIcon fontSize="small" /></IconButton>
-              <IconButton size="small" color="error" onClick={() => handleDelete(journey.id)} title="Delete" aria-label="Delete journey"><DeleteIcon fontSize="small" /></IconButton>
-            </Box>
-          </Paper>
-        ))}
-
-        {journeys.length === 0 && (
-          <Paper className="railx-empty-state" variant="outlined" sx={{ py: 5, px: 2, textAlign: 'center', color: 'text.secondary' }}>
-            No journeys planned. Click "Add Journey" to create one.
-          </Paper>
+                  <div className="railx-row-actions">
+                    <StatusBadge status="READY" compact />
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpen(journey)} aria-label="Edit journey"><EditIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Duplicate"><IconButton size="small" onClick={() => handleDuplicate(journey)} aria-label="Duplicate journey"><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDelete(journey.id)} aria-label="Delete journey"><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="railx-empty-state">
+            <Typography variant="body2" fontWeight={750}>No journeys planned.</Typography>
+            <Typography variant="caption">Add a journey to make it available for automation.</Typography>
+          </div>
         )}
-      </Stack>
+      </section>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth scroll="paper"
         PaperProps={{ sx: { m: { xs: 1, sm: 2 }, width: 'calc(100% - 16px)', maxHeight: { xs: 'calc(100% - 16px)', sm: 'calc(100% - 32px)' } } }}>
