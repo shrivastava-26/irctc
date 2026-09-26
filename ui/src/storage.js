@@ -68,6 +68,7 @@ export function saveJobs(jobs) {
 }
 
 export function buildJob(account, journey) {
+  const method = String(journey.paymentPreference?.method || (journey.upiId ? 'UPI' : 'UPI')).toUpperCase()
   return {
     id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8),
     createdAt: new Date().toISOString(),
@@ -78,13 +79,21 @@ export function buildJob(account, journey) {
     journey: {
       source: journey.source,
       destination: journey.destination,
-      trainNumber: journey.trainNumber,
+      trainNumber: journey.trainNumber || '',
+      selectedTrains: Array.isArray(journey.selectedTrains) ? journey.selectedTrains : undefined,
       travelDate: journey.travelDate,
       coach: journey.coach,
       quota: journey.quota,
       boardingStation: journey.boardingStation || '',
       passengers: journey.passengers || [],
-      upiId: journey.upiId || '',
+      useMasterPassenger: Boolean(journey.useMasterPassenger),
+      paymentPreference: {
+        method,
+        upiId: method === 'UPI' ? (journey.paymentPreference?.upiId || journey.upiId || '') : '',
+        ewallet: {
+          transactionPasswordReference: journey.paymentPreference?.ewallet?.transactionPasswordReference || null,
+        },
+      },
       executionMode: journey.executionMode || 'NOW',
       scheduledAt: journey.scheduledAt || null,
     },

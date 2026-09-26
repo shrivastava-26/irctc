@@ -12,15 +12,18 @@ function normalizeAccountName(accountName) {
 async function getCredentials(accountName) {
   const envUser = process.env.IRCTC_USERNAME
   const envPass = process.env.IRCTC_PASSWORD
-
-  if (envUser && envPass) {
-    return { username: envUser, password: envPass }
-  }
-
   const key = normalizeAccountName(accountName)
   const stored = sessionCredentials.get(key)
 
-  if (!stored) {
+  if (envUser && envPass) {
+    return {
+      username: envUser,
+      password: envPass,
+      ewalletTransactionPassword: stored?.ewalletTransactionPassword || null,
+    }
+  }
+
+  if (!stored?.username || !stored?.password) {
     throw new Error(
       'No credentials available for this account in the current server session. ' +
       'Save the account again after a server restart.'
@@ -37,9 +40,25 @@ async function setCredentials(accountName, password) {
     throw new Error('accountName and password are required')
   }
 
+  const previous = sessionCredentials.get(key) || {}
   sessionCredentials.set(key, {
+    ...previous,
     username: key,
     password: String(password),
+  })
+}
+
+async function setEwalletTransactionPassword(accountName, transactionPassword) {
+  const key = normalizeAccountName(accountName)
+  if (!key || !transactionPassword) {
+    throw new Error('accountName and transactionPassword are required')
+  }
+
+  const previous = sessionCredentials.get(key) || {}
+  sessionCredentials.set(key, {
+    ...previous,
+    username: previous.username || key,
+    ewalletTransactionPassword: String(transactionPassword),
   })
 }
 
@@ -50,5 +69,6 @@ async function listCredentialReferences() {
 module.exports = {
   getCredentials,
   setCredentials,
+  setEwalletTransactionPassword,
   listCredentialReferences,
 }

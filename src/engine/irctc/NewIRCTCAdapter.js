@@ -181,23 +181,11 @@ class NewIRCTCAdapter extends IRCTCAdapter {
   }
 
   async selectPassengers() {
-    const master = this.page.getByRole('button', {
-      name: /master passenger|master list|saved passenger|existing passenger/i,
-    }).first()
+    const masterSelections = await this.applyMasterPassengerSelections()
 
-    if (await master.isVisible().catch(() => false)) {
-      await master.click()
-      for (const passenger of this.request.passengers) {
-        const saved = this.page.getByText(
-          new RegExp('^' + escapeRegExp(passenger.name) + '$', 'i'),
-        ).first()
-        if (await saved.isVisible().catch(() => false)) await saved.click()
-      }
-      const close = this.page.getByRole('button', { name: /done|close|apply/i }).last()
-      if (await close.isVisible().catch(() => false)) await close.click()
-    }
-
-    const containers = this.page.locator('app-passenger-detail, app-passenger, .passenger-card, .passenger-form, tr.passenger-row')
+    const containers = this.page.locator(
+      'app-passenger-detail, app-passenger, .passenger-card, .passenger-form, tr.passenger-row',
+    )
     const count = await containers.count()
     if (count < this.request.passengers.length) {
       throw new Error('Could not locate scoped passenger containers for every passenger.')
@@ -206,7 +194,15 @@ class NewIRCTCAdapter extends IRCTCAdapter {
     for (let index = 0; index < this.request.passengers.length; index += 1) {
       const passenger = this.request.passengers[index]
       const card = containers.nth(index)
+
+      if (masterSelections.has(index) && await this.verifyMasterPassenger(card, passenger, index)) {
+        continue
+      }
+
       await this.fillPassengerCard(card, passenger, index)
+      if (this.request.useMasterPassenger) {
+        this.emitLog('[MASTER] Passenger ' + (index + 1) + ' using local passenger data.')
+      }
     }
   }
 
@@ -266,23 +262,6 @@ class NewIRCTCAdapter extends IRCTCAdapter {
     return this.validateBooking()
   }
 
-  async submitTransaction() {
-    await this.validateReview()
-    const button = this.page.getByRole('button', {
-      name: /pay.*book|confirm booking|submit|proceed/i,
-    }).last()
-    await button.waitFor({ state: 'visible', timeout: 20000 })
-    if (!(await button.isEnabled())) throw new Error('Final new-surface transaction control is disabled.')
-
-    const popupPromise = this.context.waitForEvent('page', { timeout: 10000 }).catch(() => null)
-    await button.click()
-    const popup = await popupPromise
-    if (popup) {
-      await popup.waitForLoadState('domcontentloaded').catch(() => {})
-      this.page = popup
-    }
-    await this.waitForSecurityChallenge(180000)
-  }
 }
 
 module.exports = { NewIRCTCAdapter }

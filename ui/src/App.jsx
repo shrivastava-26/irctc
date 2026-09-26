@@ -71,6 +71,17 @@ export default function App() {
     toast.success('Account selected')
   }
 
+  const storeEwalletCredential = async (accountUsername, transactionPassword) => {
+    const response = await fetch(API + '/credentials/ewallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountName: accountUsername, transactionPassword }),
+    })
+    let data = {}
+    try { data = await response.json() } catch {}
+    if (!response.ok) throw new Error(data.error || 'Failed to store eWallet credential')
+  }
+
   const handleJourneysSave = (nextJourneys) => {
     setJourneys(nextJourneys)
     saveJourneys(nextJourneys)
@@ -133,6 +144,7 @@ export default function App() {
         entrySurface: journey.entrySurface || 'AUTO',
         quota: journey.quota,
         trainNumber: journey.trainNumber || undefined,
+        selectedTrains: Array.isArray(journey.selectedTrains) ? journey.selectedTrains : undefined,
         preferredTrains: Array.isArray(journey.preferredTrains) ? journey.preferredTrains : [],
         backupTrains: Array.isArray(journey.backupTrains) ? journey.backupTrains : [],
         trainSelectionPolicy: journey.trainSelectionPolicy || 'FIRST_VALID',
@@ -142,9 +154,14 @@ export default function App() {
           ? String(journey.boardingStation).toUpperCase()
           : undefined,
         passengers: journey.passengers,
+        useMasterPassenger: Boolean(journey.useMasterPassenger),
         paymentPreference: {
-          method: 'UPI',
-          upiId: journey.upiId,
+          method: String(journey.paymentPreference?.method || (journey.upiId ? 'UPI' : 'UPI')).toUpperCase(),
+          upiId: String(journey.paymentPreference?.upiId || journey.upiId || ''),
+          ewallet: {
+            transactionPasswordReference:
+              journey.paymentPreference?.ewallet?.transactionPasswordReference || null,
+          },
         },
         executionMode: journey.executionMode,
         scheduledAt: journey.executionMode === 'SCHEDULED' ? journey.scheduledAt : undefined,

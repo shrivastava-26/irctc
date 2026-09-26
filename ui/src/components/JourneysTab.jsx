@@ -7,7 +7,18 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { toast } from 'react-toastify'
 import JourneyEditor from './JourneyEditor'
 
-export default function JourneysTab({ journeys, onSave }) {
+function trainSummary(journey) {
+  if (Array.isArray(journey.selectedTrains)) {
+    const selected = journey.selectedTrains
+      .filter(item => item?.selected !== false)
+      .slice()
+      .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0))
+    if (selected.length) return selected.map(item => String(item.trainNumber)).join(' → ')
+  }
+  return journey.trainNumber || 'AUTO-SELECT'
+}
+
+export default function JourneysTab({ journeys, onSave, accountUsername = '', onSecurePaymentCredential }) {
   const [open, setOpen] = useState(false)
   const [editingJourney, setEditingJourney] = useState(null)
 
@@ -43,7 +54,6 @@ export default function JourneysTab({ journeys, onSave }) {
         <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' }, fontWeight: 'bold' }}>
           PLANNED JOURNEYS
         </Typography>
-
         <Button startIcon={<AddIcon />} variant="contained" color="secondary" size="small" onClick={() => handleOpen()} sx={{ width: { xs: '100%', sm: 'auto' } }}>
           Add Journey
         </Button>
@@ -51,27 +61,19 @@ export default function JourneysTab({ journeys, onSave }) {
 
       <Stack spacing={1.5}>
         {journeys.map(journey => (
-          <Paper key={journey.id} variant="outlined" sx={{
-            p: { xs: 1.25, sm: 1.5 },
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: { xs: 'stretch', sm: 'flex-start' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 1.25,
-            minWidth: 0,
-          }}>
+          <Paper key={journey.id} variant="outlined" sx={{ p: { xs: 1.25, sm: 1.5 }, display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 1.25, minWidth: 0 }}>
             <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.9rem', overflowWrap: 'anywhere', lineHeight: 1.5 }}>
-                {journey.trainNumber} · {journey.source} → {journey.destination} · {journey.travelDate}
+                {trainSummary(journey)} · {journey.source} → {journey.destination} · {journey.travelDate}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                 {journey.coach} • {journey.quota} • {(journey.passengers && journey.passengers.length) || 0} Passenger(s)
+                {journey.useMasterPassenger ? ' • Master Passenger' : ''}
+                {' • ' + (journey.paymentPreference?.method || 'UPI')}
               </Typography>
-              {(journey.boardingStation || journey.upiId) && (
+              {journey.boardingStation && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {journey.boardingStation ? 'Boarding: ' + journey.boardingStation : ''}
-                  {journey.boardingStation && journey.upiId ? ' • ' : ''}
-                  {journey.upiId ? 'UPI configured' : ''}
+                  Boarding: {journey.boardingStation}
                 </Typography>
               )}
             </Box>
@@ -94,7 +96,13 @@ export default function JourneysTab({ journeys, onSave }) {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth scroll="paper"
         PaperProps={{ sx: { m: { xs: 1, sm: 2 }, width: 'calc(100% - 16px)', maxHeight: { xs: 'calc(100% - 16px)', sm: 'calc(100% - 32px)' } } }}>
         <DialogContent sx={{ p: 0, overflowX: 'hidden' }}>
-          <JourneyEditor initialData={editingJourney} onSave={handleSaveJourney} onCancel={() => setOpen(false)} />
+          <JourneyEditor
+            initialData={editingJourney}
+            onSave={handleSaveJourney}
+            onCancel={() => setOpen(false)}
+            accountUsername={accountUsername}
+            onSecurePaymentCredential={onSecurePaymentCredential}
+          />
         </DialogContent>
       </Dialog>
     </Box>

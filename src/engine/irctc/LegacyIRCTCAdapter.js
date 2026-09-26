@@ -164,20 +164,7 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
   }
 
   async selectPassengers() {
-    const master = this.page.getByRole('button', {
-      name: /master passenger|master list|saved passenger|existing passenger/i,
-    }).first()
-    if (await master.isVisible().catch(() => false)) {
-      await master.click()
-      for (const passenger of this.request.passengers) {
-        const saved = this.page.getByText(
-          new RegExp('^' + escapeRegExp(passenger.name) + '$', 'i'),
-        ).first()
-        if (await saved.isVisible().catch(() => false)) await saved.click()
-      }
-      const close = this.page.getByRole('button', { name: /done|close|apply/i }).last()
-      if (await close.isVisible().catch(() => false)) await close.click()
-    }
+    const masterSelections = await this.applyMasterPassengerSelections()
 
     const rows = this.page.locator(
       'app-passenger-detail, app-passenger, .passenger-card, .passenger-form, tr.passenger-row',
@@ -190,73 +177,72 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
     for (let i = 0; i < this.request.passengers.length; i += 1) {
       const passenger = this.request.passengers[i]
       const row = rows.nth(i)
-      const name = [
-        row.getByLabel(/^name$/i).first(),
-        row.locator('input[placeholder*="name" i]').first(),
-        row.locator('input[name*="name" i]').first(),
-      ]
-      const age = [
-        row.getByLabel(/^age$/i).first(),
-        row.locator('input[placeholder*="age" i]').first(),
-        row.locator('input[name*="age" i]').first(),
-      ]
 
-      let nameField = null
-      for (const c of name) if (await c.isVisible().catch(() => false)) { nameField = c; break }
-      let ageField = null
-      for (const c of age) if (await c.isVisible().catch(() => false)) { ageField = c; break }
+      if (masterSelections.has(i) && await this.verifyMasterPassenger(row, passenger, i)) {
+        continue
+      }
 
-      if (!nameField || !ageField) throw new Error('Passenger fields missing for passenger ' + (i + 1))
-      await nameField.fill(passenger.name)
-      await ageField.fill(String(passenger.age))
+      await this.fillPassengerRow(row, passenger, i)
+      if (this.request.useMasterPassenger) {
+        this.emitLog('[MASTER] Passenger ' + (i + 1) + ' using local passenger data.')
+      }
+    }
+  }
 
-      const gender = row.getByLabel(/^gender$/i).first()
-      if (await gender.isVisible().catch(() => false)) {
-        await gender.click()
+  async fillPassengerRow(row, passenger, index) {
+    const findVisible = async candidates => {
+      for (const candidate of candidates) {
+        if (await candidate.isVisible().catch(() => false)) return candidate
+      }
+      return null
+    }
+
+    const nameField = await findVisible([
+      row.getByLabel(/^name$/i).first(),
+      row.locator('input[placeholder*="name" i]').first(),
+      row.locator('input[name*="name" i]').first(),
+    ])
+    const ageField = await findVisible([
+      row.getByLabel(/^age$/i).first(),
+      row.locator('input[placeholder*="age" i]').first(),
+      row.locator('input[name*="age" i]').first(),
+    ])
+
+    if (!nameField || !ageField) {
+      throw new Error('Passenger fields missing for passenger ' + (index + 1))
+    }
+
+    await nameField.fill(passenger.name)
+    await ageField.fill(String(passenger.age))
+
+    const gender = row.getByLabel(/^gender$/i).first()
+    if (await gender.isVisible().catch(() => false)) {
+      await gender.click()
+      const option = this.page.getByRole('option', {
+        name: new RegExp('^' + escapeRegExp(passenger.gender) + '$', 'i'),
+      }).last()
+      if (await option.isVisible().catch(() => false)) await option.click()
+    }
+
+    if (passenger.berth && !/no preference|any/i.test(passenger.berth)) {
+      const berth = row.getByLabel(/^berth$/i).first()
+      if (await berth.isVisible().catch(() => false)) {
+        await berth.click()
         const option = this.page.getByRole('option', {
-          name: new RegExp('^' + escapeRegExp(passenger.gender) + '$', 'i'),
+          name: new RegExp(escapeRegExp(passenger.berth), 'i'),
         }).last()
         if (await option.isVisible().catch(() => false)) await option.click()
       }
+    }
 
-      if (passenger.berth && !/no preference|any/i.test(passenger.berth)) {
-        const berth = row.getByLabel(/^berth$/i).first()
-        if (await berth.isVisible().catch(() => false)) {
-          await berth.click()
-          const option = this.page.getByRole('option', {
-            name: new RegExp(escapeRegExp(passenger.berth), 'i'),
-          }).last()
-          if (await option.isVisible().catch(() => false)) await option.click()
-        }
-      }
-
-      if (
-        (await nameField.inputValue()) !== passenger.name ||
-        (await ageField.inputValue()) !== String(passenger.age)
-      ) throw new Error('Passenger verification failed for ' + passenger.name)
+    if (
+      (await nameField.inputValue()) !== passenger.name ||
+      (await ageField.inputValue()) !== String(passenger.age)
+    ) {
+      throw new Error('Passenger verification failed for ' + passenger.name)
     }
   }
 
-  async submitTransaction() {
-    await this.validateReview()
-    const button = this.page.getByRole('button', {
-      name: /pay.*book|confirm booking|submit|proceed/i,
-    }).last()
-    await button.waitFor({ state: 'visible', timeout: 20000 })
-    if (!(await button.isEnabled())) throw new Error('Legacy transaction control is disabled.')
-    const popup = this.context.waitForEvent('page', { timeout: 10000 }).catch(() => null)
-    await button.click()
-    const newPage = await popup
-    if (newPage) {
-      await newPage.waitForLoadState('domcontentloaded').catch(() => {})
-      this.page = newPage
-    }
-    await this.waitForSecurityChallenge()
-  }
-
-  async validateReview() {
-    return this.validateBooking()
-  }
 }
 
 module.exports = { LegacyIRCTCAdapter }

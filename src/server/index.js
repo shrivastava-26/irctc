@@ -50,6 +50,8 @@ function toPublicJob(job) {
       browser: req.browser || null,
       availabilityRequirement: req.availabilityRequirement || 'AVAILABLE',
       passengerCount: Array.isArray(req.passengers) ? req.passengers.length : 0,
+      useMasterPassenger: Boolean(req.useMasterPassenger),
+      selectedTrains: Array.isArray(req.selectedTrains) ? req.selectedTrains : null,
       paymentMethod: req.paymentPreference && req.paymentPreference.method
         ? req.paymentPreference.method
         : null,
@@ -142,6 +144,28 @@ app.post('/credentials', async (req, res) => {
     res.json({
       ok: true,
       message: 'Credentials stored for the active server session.',
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/credentials/ewallet', async (req, res) => {
+  const { accountName, transactionPassword } = req.body || {}
+
+  if (!accountName || !transactionPassword) {
+    return res.status(400).json({
+      error: 'accountName and transactionPassword are required',
+    })
+  }
+
+  try {
+    const { setEwalletTransactionPassword } = require('../security/CredentialManager')
+    await setEwalletTransactionPassword(accountName, transactionPassword)
+
+    res.json({
+      ok: true,
+      message: 'IRCTC eWallet credential stored for the active server session.',
     })
   } catch (err) {
     res.status(500).json({ error: err.message })

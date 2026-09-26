@@ -69,3 +69,124 @@ test('booking request supports Auto surface and FIRST_VALID without a train numb
   assert.equal(normalized.trainSelectionPolicy, 'FIRST_VALID')
   assert.equal(normalized.trainNumber, null)
 })
+
+const { selectedTrainEntries, orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
+const { normalizePassengerValue, passengerIdentityMatches, findMasterPassenger } = require('../../src/engine/irctc/masterPassenger')
+
+test('explicit selected trains are validated, normalized by priority, and exclude unchecked candidates', () => {
+  const request = {
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    travelDate: '26/11/2026',
+    coach: 'SL',
+    quota: 'GENERAL',
+    passengers: [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+    selectedTrains: [
+      { trainNumber: ' 12301 ', priority: 2, selected: true },
+      { trainNumber: '12951', priority: 1, selected: true },
+      { trainNumber: '12424', priority: 3, selected: false },
+    ],
+    trainSelectionPolicy: 'FIRST_VALID',
+  }
+
+  assert.deepEqual(BookingRequest.validate(request), [])
+  const normalized = BookingRequest.normalize(request)
+  assert.deepEqual(
+    normalized.selectedTrains.map(item => [item.trainNumber, item.priority, item.selected]),
+    [['12951', 1, true], ['12301', 2, true], ['12424', 3, false]],
+  )
+  assert.deepEqual(selectedTrainEntries(normalized).map(item => item.trainNumber), ['12951', '12301'])
+  assert.deepEqual(orderedTrainNumbers(normalized, [{ trainNumber: '12424' }]), ['12951', '12301'])
+})
+
+test('single explicit train remains a hard constraint', () => {
+  const request = {
+    selectedTrains: [{ trainNumber: '12951', priority: 1, selected: true }],
+    trainSelectionPolicy: 'FIRST_VALID',
+  }
+  assert.deepEqual(orderedTrainNumbers(request, [{ trainNumber: '12301' }]), ['12951'])
+})
+
+test('explicit selected trains reject malformed, duplicate, and all-unchecked values', () => {
+  const malformed = {
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    travelDate: '26/11/2026',
+    coach: 'SL',
+    passengers: [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+    selectedTrains: [{ trainNumber: '1234', priority: 1, selected: true }],
+  }
+  assert.match(BookingRequest.validate(malformed).join(' '), /5-digit train number/)
+
+  const duplicate = {
+    ...malformed,
+    selectedTrains: [
+      { trainNumber: '12951', priority: 1, selected: false },
+      { trainNumber: '12951', priority: 2, selected: false },
+    ],
+  }
+  const duplicateErrors = BookingRequest.validate(duplicate).join(' ')
+  assert.match(duplicateErrors, /duplicate train number/)
+  assert.match(duplicateErrors, /At least one train must be selected/)
+})
+
+test('master passenger identity requires normalized name, age, and gender', () => {
+  assert.equal(normalizePassengerValue('  Prince   Raj '), 'prince raj')
+  assert.equal(
+    passengerIdentityMatches(
+      { name: 'Prince  Raj', age: '24', gender: 'Male' },
+      { name: 'prince raj', age: 24, gender: 'male' },
+    ),
+    true,
+  )
+  assert.equal(
+    passengerIdentityMatches(
+      { name: 'Prince Raj', age: 25, gender: 'Male' },
+      { name: 'Prince Raj', age: 24, gender: 'Male' },
+    ),
+    false,
+  )
+  assert.deepEqual(
+    findMasterPassenger(
+      [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+      { name: 'Prince Raj', age: 24, gender: 'Male' },
+    ),
+    { name: 'Prince Raj', age: 24, gender: 'Male' },
+  )
+})
+
+test('eWallet configuration stores only a reference, not a raw password', () => {
+  const request = {
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    travelDate: '26/11/2026',
+    coach: 'SL',
+    passengers: [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+    selectedTrains: [{ trainNumber: '12951', priority: 1, selected: true }],
+    paymentPreference: {
+      method: 'EWALLET',
+      ewallet: { transactionPasswordReference: 'session' },
+      transactionPassword: 'DO_NOT_STORE',
+    },
+  }
+
+  assert.deepEqual(BookingRequest.validate(request), [])
+  const normalized = BookingRequest.normalize(request)
+  assert.equal(normalized.paymentPreference.method, 'EWALLET')
+  assert.equal(normalized.paymentPreference.ewallet.transactionPasswordReference, 'session')
+  assert.equal(Object.prototype.hasOwnProperty.call(normalized.paymentPreference, 'transactionPassword'), false)
+})
+
+test('availability selection still respects the configured requirement', () => {
+  const candidate = {
+    trainNumber: '12301',
+    availability: { status: 'AVAILABLE', raw: 'AVAILABLE-0010' },
+  }
+  assert.equal(
+    pickFirstSatisfied([candidate], 'AVAILABLE', availabilitySatisfies),
+    candidate,
+  )
+})

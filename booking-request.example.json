@@ -6,9 +6,22 @@
   "travelDate": "26/11/2026",
   "quota": "GENERAL",
   "coach": "SL",
+  "selectedTrains": [
+    {
+      "trainNumber": "12951",
+      "priority": 1,
+      "selected": true
+    },
+    {
+      "trainNumber": "12301",
+      "priority": 2,
+      "selected": true
+    }
+  ],
   "preferredTrains": [],
   "backupTrains": [],
   "availabilityRequirement": "AVAILABLE",
+  "useMasterPassenger": false,
   "passengers": [
     {
       "name": "Prince Raj",
@@ -20,7 +33,10 @@
   ],
   "paymentPreference": {
     "method": "UPI",
-    "upiId": "YOUR_UPI_ID"
+    "upiId": "YOUR_UPI_ID",
+    "ewallet": {
+      "transactionPasswordReference": null
+    }
   },
   "executionMode": "NOW",
   "fastMode": true,

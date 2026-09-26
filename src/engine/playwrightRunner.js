@@ -133,6 +133,7 @@ async function runBooking(job, credentials, onEvent) {
   let session = null
   let adapter = null
   let verification = null
+  let masterPassengerCache = null
 
   const save = (state, phase, message, metadata = null) => {
     return RunStateStore.save(job.id, {
@@ -335,8 +336,13 @@ async function runBooking(job, credentials, onEvent) {
     await step(
       'PRELOAD_MASTER_DATA',
       'PREPARE_JOURNEY',
-      'Preparing local passenger configuration.',
-      async () => true,
+      'Preparing passenger source configuration.',
+      async () => {
+        await adapter.preloadMasterData()
+        masterPassengerCache = Array.isArray(adapter.masterPassengerCache)
+          ? adapter.masterPassengerCache.slice()
+          : []
+      },
     )
 
     await step(
@@ -362,6 +368,8 @@ async function runBooking(job, credentials, onEvent) {
       runtimeSurface,
       argsFor(session, request, credentials, job.id, onEvent),
     )
+    adapter.masterPassengerCache = masterPassengerCache || []
+    adapter.masterPassengerLoaded = Boolean(request.useMasterPassenger)
 
     save(currentState, 'IDLE', 'Runtime surface resolved.', {
       entrySurface: requestedEntry,
