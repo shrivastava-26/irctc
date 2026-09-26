@@ -5,6 +5,7 @@ const {
   availabilitySatisfies,
   escapeRegExp,
   detectRuntimeSurfaceFromUrl,
+  detectPreSearchSurfaceFromUrl,
 } = require('./utils')
 const { orderedTrainNumbers, pickFirstSatisfied } = require('./selection')
 const RunStateStore = require('../RunStateStore')
@@ -147,52 +148,71 @@ class IRCTCAdapter {
     return { blocked: false, reason: null }
   }
 
-  async detectPreSearchSurface() {
-    const blocked = await this.detectEntryAccessProblem()
-    if (blocked.blocked) {
+  async detectPreSearchSurface(options = {}) {
+    const configuredTimeout = Number(options.timeoutMs)
+    const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : Number(process.env.IRCTC_PRESEARCH_DETECTION_TIMEOUT_MS) || 15000
+    const deadline = Date.now() + timeoutMs
+
+    const initialAccess = await this.detectEntryAccessProblem()
+    if (initialAccess.blocked) {
       throw new Error(
-        blocked.reason +
+        initialAccess.reason +
         ' The browser reached IRCTC, but the execution network was denied before the journey form rendered.'
       )
     }
 
-    const url = this.page.url()
-    if (/\/nget(?:\/|$)/i.test(url)) {
-      this.runtimeSurface = SURFACES.LEGACY
-      return this.runtimeSurface
-    }
-    if (/\/eticket(?:\/|$)/i.test(url)) {
-      this.runtimeSurface = SURFACES.NEW
-      return this.runtimeSurface
-    }
-
-    const legacySignals = [
-      this.page.locator('#origin:visible').first(),
-      this.page.locator('input[formcontrolname="origin"]:visible').first(),
-      this.page.locator('input[name*="origin" i]:visible').first(),
-    ]
-    for (const signal of legacySignals) {
-      if (await signal.isVisible().catch(() => false)) {
-        this.runtimeSurface = SURFACES.LEGACY
+    let lastUrl = this.page.url()
+    while (Date.now() < deadline) {
+      const url = this.page.url()
+      lastUrl = url
+      const routeSurface = detectPreSearchSurfaceFromUrl(url)
+      if (routeSurface !== SURFACES.UNKNOWN) {
+        this.runtimeSurface = routeSurface
         return this.runtimeSurface
       }
+
+      const legacySignals = [
+        this.page.locator('#origin:visible').first(),
+        this.page.locator('input[formcontrolname="origin"]:visible').first(),
+        this.page.locator('input[name*="origin" i]:visible').first(),
+      ]
+      for (const signal of legacySignals) {
+        if (await signal.isVisible().catch(() => false)) {
+          this.runtimeSurface = SURFACES.LEGACY
+          return this.runtimeSurface
+        }
+      }
+
+      const newSignals = [
+        this.page.getByRole('combobox', { name: /from station/i }).first(),
+        this.page.locator('input[formcontrolname="origin"]:visible').first(),
+        this.page.locator('input[placeholder*="from" i]:visible').first(),
+        this.page.locator('input[aria-label*="from" i]:visible').first(),
+        this.page.locator('app-jp-input:visible').first(),
+      ]
+      for (const signal of newSignals) {
+        if (await signal.isVisible().catch(() => false)) {
+          this.runtimeSurface = SURFACES.NEW
+          return this.runtimeSurface
+        }
+      }
+
+      await this.page.waitForTimeout(250)
     }
 
-    const newSignals = [
-      this.page.getByRole('combobox', { name: /from station/i }).first(),
-      this.page.locator('input[placeholder*="from" i]:visible').first(),
-      this.page.locator('input[aria-label*="from" i]:visible').first(),
-    ]
-    for (const signal of newSignals) {
-      if (await signal.isVisible().catch(() => false)) {
-        this.runtimeSurface = SURFACES.NEW
-        return this.runtimeSurface
-      }
-    }
+    const finalAccess = await this.detectEntryAccessProblem()
+    let title = ''
+    if (typeof this.page.title === 'function') title = await this.page.title().catch(() => '')
+    this.emitLog('[SURFACE] Pre-search detection timed out.', {
+      url: lastUrl,
+      title,
+      blocked: finalAccess.blocked,
+    })
 
     return SURFACES.UNKNOWN
   }
-
   trainContainers() {
     return this.runtimeSurface === SURFACES.NEW
       ? this.page.locator('div.train-result-container')
