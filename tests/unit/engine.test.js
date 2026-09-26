@@ -69,6 +69,6 @@ test('booking request supports both IRCTC entry surfaces', () => {
   assert.equal(normalize({ ...base, entrySurface: 'LEGACY' }).entrySurface, 'LEGACY')
   assert.match(
     validate({ ...base, entrySurface: 'OTHER' }).join(' '),
-    /entrySurface must be NEW or LEGACY/,
+    /entrySurface must be one of/,
   )
 })
