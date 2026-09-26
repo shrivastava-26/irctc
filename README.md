@@ -114,6 +114,12 @@ Run the scheduler/one-command wrapper:
 
     npm run auto-book
 
+Run a local IRCTC network/access diagnostic (no credentials, no booking):
+
+    npm run diagnose:irctc
+
+By default this uses a headed browser because the live worker also executes headed. Set SIVA_PREFLIGHT_HEADLESS=true only when the local machine has no GUI. The live worker does not block a job on this optional preflight unless SIVA_PREFLIGHT=true and SIVA_ENFORCE_PREFLIGHT=true are explicitly enabled; the actual execution browser is the source of truth for access.
+
 The autonomous path persists execution checkpoints under .data/automation-runs/<jobId>/state.json, records bounded transition history, and writes timing telemetry.
 
 Configure the request from booking-request.example.json using BOOKING_REQUEST_FILE or BOOKING_REQUEST_JSON. Credentials are supplied through environment variables or the existing server credential reference; do not commit real passwords or payment secrets.
