@@ -8,7 +8,6 @@ const { Job } = require('../models/Job')
 const { validate, normalize } = require('../models/BookingRequest')
 const JobStore = require('../persistence/JobStore')
 const Scheduler = require('../scheduler/Scheduler')
-const { searchTrains } = require('./trainSearch')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -121,23 +120,6 @@ app.post('/jobs/:id/events', (req, res) => {
 // Serve the production Vite build from the same origin as the API.
 // This is required for the Render web service, which runs only the Node server.
 const uiDistPath = path.join(__dirname, '../../ui/dist')
-
-app.get('/trains', async (req, res) => {
-  const { from, to, date, class: travelClass } = req.query
-  if (!from || !to || !date) {
-    return res.status(400).json({ error: 'from, to and date are required' })
-  }
-
-  try {
-    const result = await searchTrains({ from, to, date, travelClass })
-    res.json(result)
-  } catch (error) {
-    res.status(502).json({
-      error: error.message || 'Train search unavailable',
-      trains: [],
-    })
-  }
-})
 
 app.get('/credentials', async (req, res) => {
   const { listCredentialReferences } = require('../security/CredentialManager')
