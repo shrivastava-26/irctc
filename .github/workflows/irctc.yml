@@ -22,7 +22,7 @@ on:
         description: "JSON booking request without credentials"
       BROWSER:
         required: false
-        default: chrome
+        default: chromium
         type: string
         description: "Browser for explicit live run"
 
@@ -31,20 +31,20 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
-
       - name: Install dependencies
         run: npm install
-
       - name: Unit tests
         run: npm run test:unit
-
-      - name: Cypress installation check
+      - name: Playwright browser smoke
+        run: npm run smoke:playwright
+      - name: Install Playwright Chromium
+        run: npm run playwright:install
+      - name: Verify legacy Cypress compatibility
         run: npx cypress verify
 
   live-booking:
@@ -53,41 +53,35 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
-
       - name: Install dependencies
         run: npm install
-
-      - name: Install Chrome and Xvfb
+      - name: Install Chromium and Xvfb
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y google-chrome-stable xvfb
-
+          sudo apt-get install -y xvfb
+          npx playwright install --with-deps chromium
+      - name: Validate booking configuration
+        env:
+          BOOKING_REQUEST_JSON: ${{ inputs.BOOKING_REQUEST_JSON }}
+        run: npm run prepare-booking
       - name: Run configured booking workflow
         env:
           IRCTC_USERNAME: ${{ inputs.USERNAME }}
           IRCTC_PASSWORD: ${{ inputs.PASSWORD }}
           BOOKING_REQUEST_JSON: ${{ inputs.BOOKING_REQUEST_JSON }}
-          FAST_MODE: 'true'
-          DEBUG_MODE: 'false'
-          CYPRESS_BROWSER: ${{ inputs.BROWSER || 'chrome' }}
-          CYPRESS_HEADED: 'true'
-        run: |
-          echo "::add-mask::$IRCTC_USERNAME"
-          echo "::add-mask::$IRCTC_PASSWORD"
-          npm run prepare
-          xvfb-run -a npm run book
-
-      - name: Upload failure screenshots
+          PLAYWRIGHT_BROWSER: ${{ inputs.BROWSER || 'chromium' }}
+          PLAYWRIGHT_HEADED: 'true'
+        run: xvfb-run -a npm run book
+      - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: irctc-failure-${{ github.run_id }}
-          path: cypress/screenshots/
+          path: artifacts/jobs/
           retention-days: 3
           if-no-files-found: ignore
