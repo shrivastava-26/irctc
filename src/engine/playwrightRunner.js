@@ -56,7 +56,9 @@ function argsFor(session, request, credentials, jobId, onEvent) {
 }
 
 function headless() {
-  if (process.env.PLAYWRIGHT_HEADED == null) return false
+  if (process.env.PLAYWRIGHT_HEADED == null) {
+    return String(process.env.RENDER || '').toLowerCase() === 'true'
+  }
   return String(process.env.PLAYWRIGHT_HEADED).toLowerCase() !== 'true'
 }
 
@@ -172,7 +174,7 @@ async function runBooking(job, credentials, onEvent) {
 
     if (recoveryMode && currentState === 'VERIFY_TRANSACTION') {
       session = await launchSession({
-        request: { ...request, browser: request.browser || 'edge' },
+        request: { ...request, browser: request.browser || process.env.PLAYWRIGHT_BROWSER || 'chromium' },
         headless: headless(),
         onEvent,
       })
@@ -280,7 +282,7 @@ async function runBooking(job, credentials, onEvent) {
       'Opening selected IRCTC entry surface and restoring persistent browser session.',
       async () => {
         session = await launchSession({
-          request: { ...request, browser: request.browser || 'edge' },
+          request: { ...request, browser: request.browser || process.env.PLAYWRIGHT_BROWSER || 'chromium' },
           headless: headless(),
           onEvent,
         })

@@ -25,6 +25,6 @@
   "executionMode": "NOW",
   "fastMode": true,
   "debugMode": false,
-  "browser": "edge",
+  "browser": "chromium",
   "trainSelectionPolicy": "FIRST_VALID"
 }
