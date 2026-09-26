@@ -87,6 +87,13 @@ app.post('/jobs', (req, res) => {
   }
 
   const normalized = normalize(req.body)
+
+  // Live IRCTC browser execution must stay on the user's local execution plane.
+  // Render remains the control plane; hosted browser execution is blocked by default.
+  if (!normalized.isMock && normalized.executionTarget === 'HOSTED' && String(process.env.SIVA_ALLOW_HOSTED_BOOKING || '').toLowerCase() !== 'true') {
+    normalized.executionTarget = 'LOCAL'
+  }
+
   const job = new Job(normalized)
   JobStore.save(job)
 

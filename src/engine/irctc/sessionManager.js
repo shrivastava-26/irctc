@@ -186,6 +186,82 @@ async function launchSession({ request, headless = false, onEvent }) {
   )
 }
 
+
+async function preflightIRCTCAccess({ request, onEvent } = {}) {
+  const requestedBrowser = configuredBrowser(request || {})
+  const candidates = resolveBrowserCandidates(requestedBrowser)
+  const failures = []
+
+  onEvent?.({
+    type: 'LOG',
+    message: '[PREFLIGHT] Checking IRCTC entry access from the local execution network.',
+    metadata: { requestedBrowser, candidates },
+  })
+
+  for (const browser of candidates) {
+    let browserInstance = null
+    try {
+      browserInstance = await chromium.launch({
+        ...browserConfig(browser),
+        headless: true,
+      })
+
+      const page = await browserInstance.newPage()
+      const response = await page.goto(
+        'https://www.irctc.co.in/nget/train-search',
+        { waitUntil: 'domcontentloaded', timeout: 45000 },
+      )
+
+      const status = response?.status?.() || null
+      const body = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+      const blocked = status === 403 || /access denied|you don't have permission to access|errors\.edgesuite\.net|reference\s*#\d+/i.test(body)
+
+      if (blocked) {
+        const result = {
+          ok: false,
+          blocked: true,
+          status,
+          browser,
+          url: page.url(),
+          reason: 'IRCTC entry was denied by the upstream CDN/WAF from the local execution network.',
+        }
+        onEvent?.({ type: 'LOG', message: '[PREFLIGHT] BLOCKED: ' + result.reason, metadata: result })
+        return result
+      }
+
+      if (status && status >= 200 && status < 400) {
+        const result = {
+          ok: true,
+          blocked: false,
+          status,
+          browser,
+          url: page.url(),
+        }
+        onEvent?.({ type: 'LOG', message: '[PREFLIGHT] IRCTC entry reachable from local worker.', metadata: result })
+        return result
+      }
+
+      failures.push(browser + ': unexpected HTTP ' + (status || 'unknown'))
+    } catch (error) {
+      failures.push(browser + ': ' + error.message)
+      if (requestedBrowser !== 'auto') break
+    } finally {
+      await browserInstance?.close().catch(() => {})
+    }
+  }
+
+  const result = {
+    ok: false,
+    blocked: false,
+    status: null,
+    browser: null,
+    url: null,
+    reason: 'IRCTC local-network preflight could not establish a usable entry page. ' + failures.join(' | '),
+  }
+  onEvent?.({ type: 'LOG', message: '[PREFLIGHT] FAILED: ' + result.reason, metadata: result })
+  return result
+}
+
 async function closeSession(session) {
   if (!session) return
   try {
@@ -203,6 +279,7 @@ module.exports = {
   browserConfig,
   configuredBrowser,
   isMissingBrowserExecutable,
+  preflightIRCTCAccess,
   launchSession,
   closeSession,
 }

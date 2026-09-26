@@ -2,6 +2,7 @@ const os = require('os')
 const crypto = require('crypto')
 
 const { runBooking, runMock } = require('../src/engine/playwrightRunner')
+const { preflightIRCTCAccess } = require('../src/engine/irctc/sessionManager')
 const { JourneyWorkerPool } = require('../src/scheduler/JourneyWorkerPool')
 const { getLocalWorkerCredentials, localWorkerAccount } = require('../src/security/LocalWorkerCredentials')
 
@@ -73,6 +74,7 @@ function sleep(ms) {
 
 const pool = new JourneyWorkerPool()
 const running = new Map()
+const preflightCache = new Map()
 let stopping = false
 let presenceStopSignal = null
 
@@ -146,6 +148,25 @@ async function completeJob(job, result) {
   })
 }
 
+
+async function ensureIRCTCAccess(request, emit) {
+  const key = String(request?.browser || 'auto')
+  const cached = preflightCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) return cached.result
+
+  const result = await preflightIRCTCAccess({
+    request,
+    onEvent: emit,
+  })
+
+  preflightCache.set(key, {
+    result,
+    expiresAt: Date.now() + 30000,
+  })
+
+  return result
+}
+
 async function runJob(job) {
   const release = await pool.acquire(job, stats => {
     console.log(
@@ -164,6 +185,13 @@ async function runJob(job) {
       type: 'LOG',
       message: '[LOCAL-WORKER] Claimed by ' + WORKER_ID + ' on the local execution plane.',
     })
+
+    if (!job.request.isMock) {
+      const preflight = await ensureIRCTCAccess(job.request, event => emitEvent(job, event))
+      if (!preflight.ok) {
+        throw new Error(preflight.reason)
+      }
+    }
 
     const credentials = job.request.isMock
       ? null

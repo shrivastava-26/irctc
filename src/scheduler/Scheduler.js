@@ -29,21 +29,20 @@ function executionStartDelayMs(scheduledAt) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+  return new Promise(resolve => setTimeout(resolve,async function schedule(job) {
+  const target = String(job.request?.executionTarget || 'LOCAL').toUpperCase()
 
-async function schedule(job) {
-  if (String(job.request?.executionTarget || '').toUpperCase() !== 'LOCAL') {
-    job.fail('Hosted browser execution is disabled. Start the local browser worker to execute this job.')
+  if (target === 'LOCAL') {
+    job.addLog('[SCHEDULER] Local execution selected; waiting for the outbound local browser worker.')
     JobStore.save(job)
     return
   }
 
-  job.addLog('[SCHEDULER] Local execution selected; waiting for the outbound local browser worker.')
-  JobStore.save(job)
-  return
-
-  /*
+  if (target === 'HOSTED' && !job.request?.isMock && String(process.env.SIVA_ALLOW_HOSTED_BOOKING || '').toLowerCase() !== 'true') {
+    job.fail('Hosted live IRCTC browser execution is disabled. Use the local browser worker so IRCTC sees the user network rather than the hosted execution network.')
+    JobStore.save(job)
+    return
+  }
 
   const delayMs = executionStartDelayMs(job.scheduledAt)
 
@@ -58,14 +57,7 @@ async function schedule(job) {
   }
 
   await execute(job)
-  */
 }
-
-async function execute(job) {
-  if (activeJobs.has(job.id)) return
-
-  const persisted = JobStore.findById(job.id)
-  if (persisted?.status === 'COMPLETED' || persisted?.request?.executionTarget === 'LOCAL') return
 
   activeJobs.add(job.id)
   let releaseWorker = null
