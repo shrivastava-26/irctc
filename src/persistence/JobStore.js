@@ -6,7 +6,7 @@ const fs = require('fs')
 const path = require('path')
 const { Job } = require('../models/Job')
 
-const DATA_DIR = path.join(__dirname, '..', '..', '.data')
+const DATA_DIR = path.resolve(process.env.SIVA_DATA_DIR || path.join(__dirname, '..', '..', '.data'))
 const JOBS_FILE = path.join(DATA_DIR, 'jobs.json')
 
 function ensureDataDir() {
