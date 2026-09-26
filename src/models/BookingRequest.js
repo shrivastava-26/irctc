@@ -7,7 +7,6 @@ const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
 const VALID_TRAIN_SELECTION = ['FIXED', 'FIRST_VALID']
 const VALID_ENTRY_SURFACES = ['AUTO', 'NEW', 'LEGACY']
-const VALID_ENTRY_SURFACES = ['NEW', 'LEGACY']
 
 function validate(data) {
   const errors = []
@@ -17,7 +16,6 @@ function validate(data) {
   if (data.entrySurface && !VALID_ENTRY_SURFACES.includes(String(data.entrySurface).toUpperCase())) {
     errors.push('entrySurface must be one of: AUTO, NEW, LEGACY')
   }
-  if (data.entrySurface && !VALID_ENTRY_SURFACES.includes(data.entrySurface)) errors.push('entrySurface must be NEW or LEGACY')
   if (!data.source) errors.push('source station code is required')
   if (!data.destination) errors.push('destination station code is required')
   if (!data.travelDate) errors.push('travelDate is required (DD/MM/YYYY)')
