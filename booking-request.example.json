@@ -24,5 +24,6 @@
   "executionMode": "NOW",
   "fastMode": true,
   "debugMode": false,
-  "browser": "edge"
+  "browser": "edge",
+  "trainSelectionPolicy": "FIRST_VALID"
 }
