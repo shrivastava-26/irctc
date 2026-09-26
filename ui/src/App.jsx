@@ -127,6 +127,11 @@ export default function App() {
       return
     }
 
+    if (!localWorkerOnline) {
+      toast.error('Local browser worker is offline. Start it before automation.')
+      return
+    }
+
     // LOCAL execution keeps the account secret on the browser/local machine.
     // The worker resolves credentials from its own environment or credential file.
     const newJobIds = []
