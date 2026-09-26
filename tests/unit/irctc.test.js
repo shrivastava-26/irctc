@@ -32,7 +32,9 @@ test('surface model supports Auto, New, Legacy and runtime handoff', () => {
   assert.equal(normalizeSurface('new'), 'NEW')
   assert.equal(normalizeSurface('LEGACY'), 'LEGACY')
   assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/eticket/booking/train-list'), 'NEW')
+  assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/eticket/train-search'), 'NEW')
   assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/nget/booking/train-list'), 'LEGACY')
+  assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/nget/train-search'), 'LEGACY')
   assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/eticket/'), 'UNKNOWN')
 })
 
