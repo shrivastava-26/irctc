@@ -170,6 +170,90 @@ async function runBooking(job, credentials, onEvent) {
   try {
     save(currentState, 'RUNNING', recoveryMode ? 'Resuming persisted booking workflow.' : 'Starting Playwright booking workflow.')
 
+    if (recoveryMode && currentState === 'VERIFY_TRANSACTION') {
+      session = await launchSession({
+        request: { ...request, browser: request.browser || 'edge' },
+        headless: headless(),
+        onEvent,
+      })
+
+      const persistedRuntime = persisted?.metadata?.runtimeSurface
+      const recoverySurface =
+        persistedRuntime === SURFACES.LEGACY
+          ? SURFACES.LEGACY
+          : persistedRuntime === SURFACES.NEW
+            ? SURFACES.NEW
+            : normalizeSurface(request.entrySurface) === SURFACES.LEGACY
+              ? SURFACES.LEGACY
+              : SURFACES.NEW
+
+      adapter = adapterFor(
+        recoverySurface,
+        argsFor(session, request, credentials, job.id, onEvent),
+      )
+
+      const currentUrl = session.page.url()
+      const onKnownBookingPage = /train-list|booking|payment|gateway|transaction/i.test(currentUrl)
+
+      if (!onKnownBookingPage) {
+        await adapter.openEntrySurface()
+      }
+
+      await adapter.ensureEnglish()
+      await adapter.ensureAuthenticated()
+
+      const reconciliation = await adapter.reconcileTransaction()
+      if (reconciliation.status === 'FAILED') {
+        throw new Error('Transaction reconciliation found a failed booking.')
+      }
+      if (reconciliation.status !== 'SUCCESS') {
+        throw new Error('Transaction outcome is unknown after recovery; no duplicate submission was attempted.')
+      }
+
+      verification = await adapter.extractAndVerifyBooking()
+      if (!verification?.pnr) {
+        throw new Error('Transaction reconciliation found a success-looking state without an authoritative PNR.')
+      }
+
+      save('SUCCESS', 'IDLE', 'Recovered and verified authoritative booking result.', verification)
+      currentState = 'SUCCESS'
+      emit(onEvent, {
+        type: 'STATE_CHANGED',
+        state: 'SUCCESS',
+        message: 'Recovered and verified authoritative booking result.',
+        metadata: verification,
+        pnr: verification.pnr,
+      })
+
+      const result = {
+        jobId: job.id,
+        success: true,
+        exitCode: 0,
+        pnr: verification.pnr,
+        state: 'SUCCESS',
+        entrySurface: normalizeSurface(request.entrySurface),
+        runtimeSurface: adapter.runtimeSurface,
+        selectedTrain: verification.selectedTrain,
+        selectedTrainName: verification.selectedTrainName,
+        selectedClass: verification.coach,
+        selectedQuota: verification.quota,
+        selectedAvailability: verification.availability,
+        elapsedMs: Date.now() - startedAt,
+        telemetry: Telemetry.snapshot(job.id),
+        error: null,
+      }
+
+      RunStateStore.save(job.id, {
+        metadata: {
+          result: verification,
+          runtimeSurface: adapter.runtimeSurface,
+          entrySurface: normalizeSurface(request.entrySurface),
+        },
+      })
+      writeResult(job.id, result)
+      return result
+    }
+
     await step(
       'LOAD_CONFIG',
       'RESTORE_SESSION',
