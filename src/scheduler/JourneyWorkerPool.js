@@ -33,6 +33,10 @@ class JourneyWorkerPool {
   stats() {
     return { concurrency: this.governor.stats(), accounts: this.accountMutex.stats() }
   }
+
+  static fromEnvironment() {
+    return new JourneyWorkerPool()
+  }
 }
 
 module.exports = { JourneyWorkerPool }
