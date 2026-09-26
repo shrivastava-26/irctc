@@ -2,7 +2,7 @@
 
 const VALID_QUOTAS = ['GENERAL', 'TATKAL', 'PREMIUM_TATKAL']
 const VALID_EXECUTION_MODES = ['NOW', 'SCHEDULED']
-const VALID_EXECUTION_TARGETS = ['HOSTED', 'LOCAL']
+const VALID_EXECUTION_TARGETS = ['LOCAL']
 const VALID_PAYMENT_METHODS = ['UPI', 'EWALLET']
 const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
@@ -18,8 +18,8 @@ function validate(data) {
     errors.push('entrySurface must be one of: AUTO, NEW, LEGACY')
   }
 
-  if (data.executionTarget && !VALID_EXECUTION_TARGETS.includes(String(data.executionTarget).toUpperCase())) {
-    errors.push('executionTarget must be one of: HOSTED, LOCAL')
+  if (data.executionTarget && String(data.executionTarget).toUpperCase() !== 'LOCAL') {
+    errors.push('executionTarget must be LOCAL; hosted browser execution is disabled')
   }
 
   if (!data.source) errors.push('source station code is required')
@@ -89,7 +89,7 @@ function normalize(data) {
 
   return {
     credentialsReference: data.credentialsReference,
-    executionTarget: String(data.executionTarget || 'HOSTED').toUpperCase(),
+    executionTarget: 'LOCAL',
     entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
     source: String(data.source).toUpperCase(),
     destination: String(data.destination).toUpperCase(),
