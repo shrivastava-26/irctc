@@ -6,6 +6,7 @@ const {
   escapeRegExp,
   detectRuntimeSurfaceFromUrl,
 } = require('./utils')
+const { orderedTrainNumbers, pickFirstSatisfied } = require('./selection')
 const RunStateStore = require('../RunStateStore')
 
 class IRCTCAdapter {
@@ -173,16 +174,6 @@ class IRCTCAdapter {
     return null
   }
 
-  orderedTrainNumbers(available) {
-    const req = this.request
-    const preferred = Array.isArray(req.preferredTrains) ? req.preferredTrains.map(String) : []
-    const backups = Array.isArray(req.backupTrains) ? req.backupTrains.map(String) : []
-
-    if (req.trainSelectionPolicy === 'FIXED') return req.trainNumber ? [String(req.trainNumber)] : []
-    if (req.trainNumber) return [String(req.trainNumber), ...preferred.filter(x => x !== String(req.trainNumber)), ...backups.filter(x => x !== String(req.trainNumber))]
-    if (preferred.length || backups.length) return [...preferred, ...backups]
-    return available.map(x => x.trainNumber)
-  }
 
   async verifyQuota() {
     const desired = String(this.request.quota || 'GENERAL').replace(/_/g, ' ')
@@ -197,7 +188,7 @@ class IRCTCAdapter {
     if (!available.length) throw new Error('No train candidates found.')
     await this.verifyQuota()
 
-    const ordered = this.orderedTrainNumbers(available)
+    const ordered = orderedTrainNumbers(this.request, available)
     let lastReason = 'no candidate satisfied the request'
 
     for (const number of ordered) {
@@ -209,7 +200,7 @@ class IRCTCAdapter {
       }
 
       const evaluation = await this.inspectAvailability(candidate)
-      if (!availabilitySatisfies(evaluation.availability, this.request.availabilityRequirement)) {
+      if (!pickFirstSatisfied([evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
         lastReason = 'train ' + number + ' / ' + this.request.coach + ' returned ' + evaluation.availability.status
         if (this.request.trainSelectionPolicy === 'FIXED') break
         continue
