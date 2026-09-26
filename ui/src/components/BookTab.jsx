@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo } from 'react'
-import { Box, Checkbox, Chip, Divider, Paper, Stack, Typography, Button } from '@mui/material'
+import { Box, Button, Checkbox, Stack, Typography } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
 import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined'
 import TrainOutlinedIcon from '@mui/icons-material/TrainOutlined'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import QueuePlayNextOutlinedIcon from '@mui/icons-material/QueuePlayNextOutlined'
-import { BentoCard, BentoGrid, GlassPanel, NeoButton, StatusBadge } from './RailxPrimitives'
+import { GlassPanel, NeoButton, StatusBadge } from './RailxPrimitives'
 
 export default function BookTab({
   accounts,
@@ -25,12 +24,10 @@ export default function BookTab({
   useEffect(() => {
     const validIds = new Set(journeys.map(journey => String(journey.id)))
     const cleaned = selectedJourneyIds.filter(id => validIds.has(String(id)))
-    if (cleaned.length !== selectedJourneyIds.length) {
-      onSelectionChange?.(cleaned)
-    }
+    if (cleaned.length !== selectedJourneyIds.length) onSelectionChange?.(cleaned)
   }, [journeys, selectedJourneyIds, onSelectionChange])
 
-  const toggleJourney = (id) => {
+  const toggleJourney = id => {
     const key = String(id)
     const next = selectedSet.has(key)
       ? selectedJourneyIds.filter(item => String(item) !== key)
@@ -41,217 +38,137 @@ export default function BookTab({
   const selectAll = () => onSelectionChange?.(journeys.map(journey => journey.id))
   const clearAll = () => onSelectionChange?.([])
   const selectedCount = selectedJourneyIds.length
+  const paymentReadyCount = journeys.filter(journey => Boolean(journey.upiId)).length
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <GlassPanel className="railx-page-intro" sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.75 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1.5}>
-          <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: 2.5,
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
-                bgcolor: 'rgba(98,217,255,0.10)',
-                color: 'primary.main',
-                border: '1px solid rgba(98,217,255,0.18)',
-              }}
-            >
-              <ManageAccountsOutlinedIcon />
+      <GlassPanel className="railx-page-intro">
+        <Stack direction="row" spacing={1.15} alignItems="center" justifyContent="space-between" minWidth={0}>
+          <Stack direction="row" spacing={1.1} alignItems="center" minWidth={0}>
+            <Box className="railx-brand-mark" sx={{ color: 'primary.main', flexShrink: 0 }}>
+              <ManageAccountsOutlinedIcon fontSize="small" />
             </Box>
             <Box minWidth={0}>
-              <Typography className="railx-kicker">ACTIVE ACCOUNT</Typography>
-              <Typography variant="body2" sx={{ mt: 0.35, fontWeight: 850, overflowWrap: 'anywhere' }}>
-                {selectedAcc
-                  ? selectedAcc.label + ' (' + selectedAcc.username + ')'
-                  : 'No account selected'}
+              <Typography className="railx-kicker">Active account</Typography>
+              <Typography variant="body2" sx={{ mt: 0.2, fontWeight: 800, overflowWrap: 'anywhere' }}>
+                {selectedAcc ? selectedAcc.label + ' · ' + selectedAcc.username : 'No account selected'}
               </Typography>
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={0.8} flexWrap="wrap" justifyContent="flex-end">
-            <Chip
-              label="LOCAL BROWSER"
-              size="small"
-              color="success"
-              variant="outlined"
-              sx={{ fontWeight: 850 }}
-            />
-            <Chip
-              icon={<QueuePlayNextOutlinedIcon />}
-              label={activeJobsCount + ' active job' + (activeJobsCount === 1 ? '' : 's')}
-              size="small"
-              variant="outlined"
-              sx={{ borderColor: 'divider' }}
-            />
+          <Stack direction="row" spacing={0.6} alignItems="center" flexShrink={0}>
+            <span className="railx-summary-pill"><QueuePlayNextOutlinedIcon sx={{ fontSize: 15 }} /> {activeJobsCount} active</span>
             <StatusBadge status={selectedAcc ? 'READY' : 'CANCELLED'} compact />
           </Stack>
         </Stack>
       </GlassPanel>
 
-      <BentoGrid>
-        <BentoCard className="railx-span-8">
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1.25}>
-            <Box>
-              <Typography className="railx-kicker">AUTOMATION QUEUE</Typography>
-              <Typography variant="h2" sx={{ mt: 0.5 }}>Ready journeys</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Select exactly the journeys that should enter the existing automation flow.
-              </Typography>
-            </Box>
+      <section className="railx-section" aria-label="Automation queue">
+        <div className="railx-section-header">
+          <Box sx={{ minWidth: 0 }}>
+            <Typography className="railx-kicker">Automation</Typography>
+            <Typography component="h1" className="railx-section-title">Ready to run</Typography>
+            <Typography className="railx-section-copy">
+              Select the saved journeys that should enter the existing automation flow.
+            </Typography>
+          </Box>
 
-            <Stack direction="row" spacing={0.5} justifyContent={{ xs: 'flex-end', sm: 'initial' }}>
-              <Button variant="text" size="small" onClick={selectAll} disabled={journeys.length === 0}>Select all</Button>
-              <Button variant="text" size="small" onClick={clearAll} disabled={selectedCount === 0}>Clear</Button>
-              {activeJobsCount > 0 && (
-                <Button variant="outlined" size="small" onClick={onOpenDialog}>Running ({activeJobsCount})</Button>
-              )}
-            </Stack>
+          <Stack direction="row" spacing={0.35} flexWrap="wrap" justifyContent="flex-end">
+            <Button variant="text" size="small" onClick={selectAll} disabled={journeys.length === 0}>Select all</Button>
+            <Button variant="text" size="small" onClick={clearAll} disabled={selectedCount === 0}>Clear</Button>
+            {activeJobsCount > 0 && <Button variant="outlined" size="small" onClick={onOpenDialog}>Running {activeJobsCount}</Button>}
           </Stack>
+        </div>
 
-          <Divider sx={{ my: 1.5 }} />
-
-          <Stack spacing={1}>
+        {journeys.length > 0 ? (
+          <div className="railx-journey-list">
             {journeys.map(journey => {
               const checked = selectedSet.has(String(journey.id))
               const paymentReady = Boolean(journey.upiId)
-              const trainValue = journey.trainNumber || (journey.preferredTrains?.[0] ? 'PRIORITY LIST' : 'AUTO')
+              const trainValue = journey.trainNumber || (journey.preferredTrains?.[0] ? 'Priority list' : 'Auto')
 
               return (
-                <Paper
+                <div
                   key={journey.id}
-                  variant="outlined"
+                  className={checked ? 'railx-journey-row is-selected' : 'railx-journey-row'}
                   onClick={() => toggleJourney(journey.id)}
-                  className={checked ? 'railx-journey-card is-selected' : 'railx-journey-card'}
-                  sx={{
-                    p: { xs: 1.25, sm: 1.5 },
-                    cursor: 'pointer',
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      toggleJourney(journey.id)
+                    }
                   }}
+                  aria-pressed={checked}
                 >
-                  <Stack direction="row" spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                  <div className="railx-row-grid">
                     <Checkbox
                       checked={checked}
                       onChange={() => toggleJourney(journey.id)}
                       onClick={event => event.stopPropagation()}
                       inputProps={{ 'aria-label': 'Select journey ' + journey.source + ' to ' + journey.destination }}
-                      color="primary"
                       size="small"
                     />
 
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={0.8}>
-                        <Box minWidth={0}>
-                          <Typography variant="body2" sx={{ fontWeight: 900, overflowWrap: 'anywhere', lineHeight: 1.45 }}>
-                            {trainValue} · {journey.source} → {journey.destination}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2 }}>
-                            {journey.travelDate} · {journey.coach} · {journey.quota}
-                          </Typography>
-                        </Box>
-                        <StatusBadge status="READY" compact />
-                      </Stack>
-
-                      <Stack direction="row" spacing={0.6} flexWrap="wrap" sx={{ mt: 0.85 }}>
-                        <Chip icon={<EventNoteOutlinedIcon />} label={(journey.passengers?.length || 0) + ' passenger' + ((journey.passengers?.length || 0) === 1 ? '' : 's')} size="small" variant="outlined" />
-                        <Chip icon={<TrainOutlinedIcon />} label={journey.trainNumber ? 'Train locked' : 'Train policy ' + (journey.trainSelectionPolicy || 'AUTO')} size="small" variant="outlined" />
-                        <Chip icon={<AccountBalanceWalletOutlinedIcon />} label={paymentReady ? 'UPI ready' : 'Payment not configured'} size="small" variant={paymentReady ? 'outlined' : 'filled'} color={paymentReady ? 'success' : 'default'} />
-                      </Stack>
+                    <Box minWidth={0}>
+                      <div className="railx-route">
+                        {journey.trainNumber ? journey.trainNumber + ' · ' : ''}{journey.source} → {journey.destination}
+                      </div>
+                      <div className="railx-route-meta">{journey.travelDate} · {journey.coach} · {journey.quota}</div>
+                      <div className="railx-meta-line">
+                        <EventNoteOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
+                        {journey.passengers?.length || 0} passenger{journey.passengers?.length === 1 ? '' : 's'}
+                        <Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>
+                        <TrainOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
+                        {journey.trainNumber ? 'Fixed train' : trainValue}
+                        <Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>
+                        <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
+                        {paymentReady ? 'UPI ready' : 'Payment not set'}
+                      </div>
                     </Box>
-                  </Stack>
-                </Paper>
+
+                    <div className="railx-row-status">
+                      <StatusBadge status="READY" compact />
+                    </div>
+                  </div>
+                </div>
               )
             })}
+          </div>
+        ) : (
+          <div className="railx-empty-state">
+            <Typography variant="body2" fontWeight={750}>No journeys are ready yet.</Typography>
+            <Typography variant="caption">Add one in Journeys to make it available for automation.</Typography>
+          </div>
+        )}
 
-            {journeys.length === 0 && (
-              <Paper className="railx-empty-state" variant="outlined">
-                <AddCircleOutlineIcon sx={{ fontSize: 42, mb: 0.6 }} />
-                <Typography variant="body2" fontWeight={800}>No ready journeys</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Create one in the Journeys tab before starting automation.
-                </Typography>
-              </Paper>
-            )}
-          </Stack>
-        </BentoCard>
+        <div className="railx-inline-metrics" aria-label="Queue summary">
+          <div className="railx-inline-metric">
+            <div className="railx-kicker">Saved</div>
+            <div className="railx-inline-metric-value">{journeys.length}</div>
+          </div>
+          <div className="railx-inline-metric">
+            <div className="railx-kicker">Selected</div>
+            <div className="railx-inline-metric-value">{selectedCount}</div>
+          </div>
+          <div className="railx-inline-metric">
+            <div className="railx-kicker">UPI ready</div>
+            <div className="railx-inline-metric-value">{paymentReadyCount}/{journeys.length || 0}</div>
+          </div>
+        </div>
+      </section>
 
-        <BentoCard className="railx-span-4 railx-console-card">
-          <Typography className="railx-kicker">AUTOMATION ENGINE</Typography>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 0.75 }}>
-            <Typography variant="h3">Control state</Typography>
-            <StatusBadge status={activeJobsCount > 0 ? 'RUNNING' : 'READY'} compact />
-          </Stack>
-
-          <Box sx={{ mt: 2 }} className="railx-metric-stack">
-            <Box><Typography className="railx-kicker">SELECTED</Typography><Typography variant="h2">{selectedCount}</Typography></Box>
-            <Box><Typography className="railx-kicker">ACTIVE JOBS</Typography><Typography variant="h2">{activeJobsCount}</Typography></Box>
-            <Box><Typography className="railx-kicker">ACCOUNT</Typography><Typography variant="body2" fontWeight={800}>{selectedAcc ? 'READY' : 'NOT SELECTED'}</Typography></Box>
-          </Box>
-
-          <Paper variant="outlined" className="railx-engine-note">
-            <Typography variant="caption" color="text.secondary">
-              Existing workers, scheduling, polling, payment handling and API contracts remain untouched by this presentation layer.
-            </Typography>
-          </Paper>
-
-          {activeJobsCount > 0 && (
-            <Button sx={{ mt: 1.25 }} fullWidth variant="outlined" onClick={onOpenDialog}>
-              OPEN LIVE CONSOLE
-            </Button>
-          )}
-        </BentoCard>
-
-        <BentoCard className="railx-span-4 railx-stat-card">
-          <Typography className="railx-kicker">TRAIN PRIORITY</Typography>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.8 }}>
-            <Box>
-              <Typography variant="h3">{journeys.some(j => j.preferredTrains?.length) ? 'P1 configured' : 'AUTO'}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Priority configuration remains in the journey editor.
-              </Typography>
-            </Box>
-            <TrainOutlinedIcon color="primary" />
-          </Stack>
-        </BentoCard>
-
-        <BentoCard className="railx-span-4 railx-stat-card">
-          <Typography className="railx-kicker">BOOKING</Typography>
-          <Typography variant="h3" sx={{ mt: 0.8 }}>READY</Typography>
-          <Typography variant="caption" color="text.secondary">Selection stays explicit before automation starts.</Typography>
-        </BentoCard>
-
-        <BentoCard className="railx-span-4 railx-stat-card">
-          <Typography className="railx-kicker">PAYMENT</Typography>
-          <Typography variant="h3" sx={{ mt: 0.8 }}>
-            {journeys.filter(j => j.upiId).length}/{journeys.length || 0} UPI ready
-          </Typography>
-          <Typography variant="caption" color="text.secondary">Read from the existing saved journey configuration.</Typography>
-        </BentoCard>
-      </BentoGrid>
-
-      <Paper
-        variant="outlined"
-        className="railx-command-bar"
-        sx={{
-          mt: 1.5,
-          p: { xs: 1.25, sm: 1.5 },
-          position: 'sticky',
-          bottom: 12,
-          zIndex: 3,
-          background: 'rgba(10,17,29,0.90)',
-        }}
-      >
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+      <Box className="railx-command-bar" sx={{ mt: 1.5 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} alignItems={{ xs: 'stretch', sm: 'center' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography className="railx-kicker">EXECUTION SCOPE</Typography>
-            <Typography variant="body2" sx={{ mt: 0.35, fontWeight: 800 }}>
+            <Typography className="railx-kicker">Execution</Typography>
+            <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 750 }}>
               {selectedCount === 0
                 ? 'Select a journey to enable automation.'
                 : selectedCount === 1
-                  ? '1 journey selected — only that journey will run.'
-                  : selectedCount + ' journeys selected — all selected journeys will run.'}
+                  ? '1 journey selected.'
+                  : selectedCount + ' journeys selected.'}
             </Typography>
           </Box>
 
@@ -262,12 +179,12 @@ export default function BookTab({
             startIcon={<PlayArrowIcon />}
             onClick={() => onStart(selectedJourneyIds)}
             disabled={!selectedAcc || selectedCount === 0}
-            sx={{ minHeight: 50, minWidth: { xs: '100%', sm: 240 } }}
+            sx={{ minHeight: 48, minWidth: { xs: '100%', sm: 230 } }}
           >
-            START AUTOMATION
+            Start automation
           </NeoButton>
         </Stack>
-      </Paper>
+      </Box>
     </Box>
   )
 }

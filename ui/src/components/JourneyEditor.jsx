@@ -94,7 +94,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, minWidth: 0 }}>
+    <Box className="railx-editor" sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, minWidth: 0 }}>
       <Typography variant="h6" color="primary" sx={{ mb: 2, fontWeight: 'bold', fontSize: { xs: '1rem', sm: '1.1rem' } }}>
         {initialData ? 'EDIT JOURNEY' : 'NEW JOURNEY'}
       </Typography>

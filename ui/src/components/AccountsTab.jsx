@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import {
-  Box, Typography, Button, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Chip, Stack, Tooltip
+  Box, Typography, Button, IconButton, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, Stack, Tooltip
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AddIcon from '@mui/icons-material/Add'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -14,6 +12,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined'
 import { toast } from 'react-toastify'
 import { exportBackup } from '../storage'
+import { GlassPanel, StatusBadge } from './RailxPrimitives'
 
 export default function AccountsTab({ accounts, selectedAccountId, onSave, onSelect }) {
   const [open, setOpen] = useState(false)
@@ -21,14 +20,10 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
   const [showPasswords, setShowPasswords] = useState(false)
   const [form, setForm] = useState({ label: '', username: '', password: '' })
 
-  const handleOpen = (account = null) => {
+  const handleOpen = account => {
     if (account) {
       setEditing(account.id)
-      setForm({
-        label: account.label || '',
-        username: account.username || '',
-        password: account.password || '',
-      })
+      setForm({ label: account.label || '', username: account.username || '', password: account.password || '' })
     } else {
       setEditing(null)
       setForm({ label: '', username: '', password: '' })
@@ -52,21 +47,14 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
     }
 
     const duplicate = accounts.some(account =>
-      account.username.trim().toLowerCase() === username.toLowerCase() &&
-      account.id !== editing
+      account.username.trim().toLowerCase() === username.toLowerCase() && account.id !== editing
     )
     if (duplicate) {
       toast.error('An account with this username already exists.')
       return
     }
 
-    const safeAccount = {
-      id: editing || Date.now().toString(),
-      label,
-      username,
-      password: form.password,
-    }
-
+    const safeAccount = { id: editing || Date.now().toString(), label, username, password: form.password }
     const updated = editing
       ? accounts.map(account => account.id === editing ? safeAccount : account)
       : accounts.concat(safeAccount)
@@ -76,227 +64,102 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
     closeDialog()
   }
 
-  const handleDelete = (id) => {
-    if (id === selectedAccountId) {
-      toast.info('The selected account will switch to another saved account.')
-    }
+  const handleDelete = id => {
+    if (id === selectedAccountId) toast.info('The selected account will switch to another saved account.')
     onSave(accounts.filter(account => account.id !== id))
     toast.success('Account removed from this browser')
   }
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Paper
-        variant="outlined"
-        sx={{
-          mb: 2,
-          p: { xs: 1.5, sm: 2 },
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(33,61,119,0.08), rgba(251,121,43,0.06))',
-          borderColor: 'rgba(33,61,119,0.12)',
-        }}
-      >
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-          justifyContent="space-between"
-          gap={1.5}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 2,
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
-                bgcolor: 'primary.main',
-                color: 'common.white',
-              }}
-            >
+      <GlassPanel className="railx-page-intro">
+        <div className="railx-section-header" style={{ marginBottom: 0 }}>
+          <Stack direction="row" spacing={1.1} alignItems="center" minWidth={0}>
+            <Box className="railx-brand-mark" sx={{ color: 'primary.main', flexShrink: 0 }}>
               <AccountCircleOutlinedIcon />
             </Box>
             <Box minWidth={0}>
-              <Typography className="railx-kicker" sx={{ fontWeight: 800 }}>
-                IRCTC Accounts
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {accounts.length === 0 ? 'No accounts saved yet' : accounts.length + ' saved account' + (accounts.length === 1 ? '' : 's')}
-              </Typography>
+              <Typography className="railx-kicker">Accounts</Typography>
+              <Typography component="h1" className="railx-section-title">IRCTC accounts</Typography>
+              <Typography className="railx-section-copy">{accounts.length} saved account{accounts.length === 1 ? '' : 's'}.</Typography>
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-            <Button
-              startIcon={<FileDownloadIcon />}
-              variant="outlined"
-              size="small"
-              onClick={exportBackup}
-              sx={{ flex: { xs: 1, sm: 'none' } }}
-            >
-              Backup
-            </Button>
-            <Button
-              startIcon={<AddIcon />}
-              variant="contained"
-              color="secondary"
-              size="small"
-              onClick={() => handleOpen()}
-              sx={{
-                flex: { xs: 1, sm: 'none' },
-                boxShadow: 'none',
-                '&:hover': { boxShadow: 'none' },
-              }}
-            >
-              Add account
-            </Button>
+          <Stack direction="row" spacing={0.8} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <Button startIcon={<FileDownloadIcon />} variant="outlined" size="small" onClick={exportBackup} sx={{ flex: { xs: 1, sm: 'none' } }}>Backup</Button>
+            <Button startIcon={<AddIcon />} variant="contained" color="primary" size="small" onClick={() => handleOpen()} sx={{ flex: { xs: 1, sm: 'none' } }}>Add account</Button>
           </Stack>
-        </Stack>
-      </Paper>
+        </div>
+      </GlassPanel>
 
-      <Paper variant="outlined" sx={{ overflow: 'hidden', borderRadius: 3 }}>
-        <TableContainer className="railx-table-wrap" sx={{ width: '100%', overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 620 }}>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 800, display: { xs: 'none', sm: 'table-cell' } }}>Password</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
+      <section className="railx-section" aria-label="Saved accounts">
+        {accounts.length > 0 ? (
+          <div>
+            {accounts.map(account => {
+              const selected = String(account.id) === String(selectedAccountId)
+              return (
+                <div key={account.id} className="railx-account-row">
+                  <div className="railx-account-grid">
+                    <div>
+                      <div className="railx-field-label">Name</div>
+                      <div className="railx-field-value">{account.label}</div>
+                    </div>
+                    <div>
+                      <div className="railx-field-label">Username</div>
+                      <div className="railx-field-value">{account.username}</div>
+                    </div>
+                    <div>
+                      <div className="railx-field-label">Status</div>
+                      {selected ? <StatusBadge status="READY" compact /> : <Button size="small" onClick={() => onSelect(account.id)}>Select</Button>}
+                    </div>
+                    <div className="railx-row-actions">
+                      <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpen(account)} aria-label="Edit account"><EditIcon fontSize="small" /></IconButton></Tooltip>
+                      <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDelete(account.id)} aria-label="Delete account"><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="railx-empty-state">
+            <AccountCircleOutlinedIcon sx={{ fontSize: 42, opacity: 0.55 }} />
+            <Typography variant="body2" fontWeight={750}>No accounts saved</Typography>
+            <Typography variant="caption">Add an IRCTC account to enable automation.</Typography>
+          </div>
+        )}
 
-            <TableBody>
-              {accounts.map(account => {
-                const selected = String(account.id) === String(selectedAccountId)
-                return (
-                  <TableRow key={account.id} hover>
-                    <TableCell sx={{ maxWidth: 160 }}>
-                      <Typography noWrap variant="body2" sx={{ fontWeight: 700 }}>
-                        {account.label}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 240 }}>
-                      <Typography noWrap variant="body2">
-                        {account.username}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>
-                      {showPasswords ? account.password : '••••••••'}
-                    </TableCell>
-                    <TableCell>
-                      {selected ? (
-                        <Chip
-                          icon={<CheckCircleIcon />}
-                          label="Selected"
-                          color="success"
-                          size="small"
-                          sx={{ height: 24, fontSize: '0.7rem' }}
-                        />
-                      ) : (
-                        <Button size="small" onClick={() => onSelect(account.id)} sx={{ fontWeight: 700 }}>
-                          Select
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => handleOpen(account)} aria-label="Edit account">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(account.id)} aria-label="Delete account">
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-
-              {accounts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 7 }}>
-                    <Stack alignItems="center" spacing={0.75}>
-                      <AccountCircleOutlinedIcon sx={{ fontSize: 42, color: 'text.disabled' }} />
-                      <Typography variant="body2" fontWeight={700}>No accounts saved</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Add an IRCTC account to enable automation.
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <Box
-          sx={{
-            px: { xs: 1.5, sm: 2 },
-            py: 1,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            justifyContent: { xs: 'space-between', sm: 'flex-end' },
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
-            Password hidden
-          </Typography>
-          <Button
-            size="small"
-            startIcon={showPasswords ? <VisibilityOffIcon /> : <VisibilityIcon />}
-            onClick={() => setShowPasswords(value => !value)}
-          >
+        <Box sx={{ mt: 1.25, pt: 1.1, borderTop: accounts.length ? '1px solid' : 0, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="caption" color="text.secondary">Password visibility</Typography>
+          <Button size="small" startIcon={showPasswords ? <VisibilityOffIcon /> : <VisibilityIcon />} onClick={() => setShowPasswords(value => !value)}>
             {showPasswords ? 'Hide passwords' : 'Show passwords'}
           </Button>
         </Box>
-      </Paper>
 
-      <Dialog
-        open={open}
-        onClose={closeDialog}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: { m: { xs: 1, sm: 2 }, width: 'calc(100% - 16px)', maxWidth: 420, borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ py: 1.75, px: { xs: 2, sm: 3 }, fontWeight: 800 }}>
+        {showPasswords && accounts.length > 0 && (
+          <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            {accounts.map(account => (
+              <Box key={account.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.45, minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary">{account.label}</Typography>
+                <Typography variant="caption" className="railx-mono" sx={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{account.password}</Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </section>
+
+      <Dialog open={open} onClose={closeDialog} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { m: { xs: 1, sm: 2 }, width: 'calc(100% - 16px)', maxWidth: 420 } }}>
+        <DialogTitle sx={{ py: 1.7, px: { xs: 2, sm: 3 }, fontWeight: 800 }}>
           {editing ? 'Edit account' : 'Add account'}
         </DialogTitle>
-
-        <DialogContent sx={{ mt: 0.5, px: { xs: 2, sm: 3 } }}>
-          <Stack spacing={2}>
-            <TextField
-              label="Account name"
-              fullWidth
-              value={form.label}
-              onChange={e => setForm({ ...form, label: e.target.value })}
-              autoComplete="off"
-            />
-            <TextField
-              label="IRCTC username"
-              fullWidth
-              value={form.username}
-              onChange={e => setForm({ ...form, username: e.target.value })}
-              autoComplete="username"
-            />
-            <TextField
-              label="Password"
-              type="password"
-              fullWidth
-              value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
-              autoComplete={editing ? 'current-password' : 'new-password'}
-            />
+        <DialogContent sx={{ mt: 0.3, px: { xs: 2, sm: 3 } }}>
+          <Stack spacing={1.6}>
+            <TextField label="Account name" fullWidth value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} autoComplete="off" />
+            <TextField label="IRCTC username" fullWidth value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} autoComplete="username" />
+            <TextField label="Password" type="password" fullWidth value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} autoComplete={editing ? 'current-password' : 'new-password'} />
           </Stack>
         </DialogContent>
-
         <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2, gap: 1 }}>
           <Button onClick={closeDialog} variant="outlined" sx={{ flex: { xs: 1, sm: 'none' } }}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" color="primary" sx={{ flex: { xs: 1, sm: 'none' } }}>Save</Button>
