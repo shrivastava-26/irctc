@@ -140,8 +140,25 @@ class IRCTCAdapter {
   }
 
   async detectPreSearchSurface() {
-    if (await this.page.locator('#origin').isVisible().catch(() => false)) return SURFACES.LEGACY
-    if (await this.page.getByRole('combobox', { name: 'From station' }).isVisible().catch(() => false)) return SURFACES.NEW
+    const byUrl = detectRuntimeSurfaceFromUrl(this.page.url())
+    if (byUrl !== SURFACES.UNKNOWN) {
+      this.runtimeSurface = byUrl
+      return byUrl
+    }
+
+    if (await this.page.locator('#origin').isVisible().catch(() => false)) {
+      this.runtimeSurface = SURFACES.LEGACY
+      return this.runtimeSurface
+    }
+
+    if (
+      await this.page.getByRole('combobox', { name: 'From station' }).isVisible().catch(() => false) ||
+      await this.page.locator('app-jp-input').filter({ hasText: /Search Trains/i }).isVisible().catch(() => false)
+    ) {
+      this.runtimeSurface = SURFACES.NEW
+      return this.runtimeSurface
+    }
+
     return SURFACES.UNKNOWN
   }
 
