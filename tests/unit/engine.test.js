@@ -30,3 +30,23 @@ test('read retries are bounded', () => {
   assert.ok(backoffMs('READ_ONLY', 2) > backoffMs('READ_ONLY', 1))
   assert.equal(backoffMs('TRANSACTIONAL', 1), 0)
 })
+
+const { validate, normalize } = require('../../src/models/BookingRequest')
+
+test('booking request supports first-valid train selection', () => {
+  const request = {
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    travelDate: '26/11/2026',
+    coach: 'SL',
+    quota: 'GENERAL',
+    passengers: [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+    trainSelectionPolicy: 'FIRST_VALID',
+  }
+
+  assert.deepEqual(validate(request), [])
+  const normalized = normalize(request)
+  assert.equal(normalized.trainSelectionPolicy, 'FIRST_VALID')
+  assert.equal(normalized.trainNumber, null)
+})
