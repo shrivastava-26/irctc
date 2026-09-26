@@ -1,5 +1,6 @@
 {
   "credentialsReference": "YOUR_IRCTC_USERNAME",
+  "entrySurface": "AUTO",
   "source": "SMVT",
   "destination": "PNBE",
   "travelDate": "26/11/2026",
