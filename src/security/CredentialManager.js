@@ -42,7 +42,9 @@ async function setCredentials(accountName, password) {
     throw new Error('accountName and password are required')
   }
 
+  const previous = sessionCredentials.get(key) || {}
   sessionCredentials.set(key, {
+    ...previous,
     username: key,
     password: String(password),
   })
