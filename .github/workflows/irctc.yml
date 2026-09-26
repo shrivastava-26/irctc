@@ -63,6 +63,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install Chrome and Xvfb
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable xvfb
+
       - name: Run configured booking workflow
         env:
           IRCTC_USERNAME: ${{ inputs.USERNAME }}
@@ -70,12 +75,13 @@ jobs:
           BOOKING_REQUEST_JSON: ${{ inputs.BOOKING_REQUEST_JSON }}
           FAST_MODE: 'true'
           DEBUG_MODE: 'false'
-          CYPRESS_BROWSER: ${{ inputs.BROWSER }}
+          CYPRESS_BROWSER: ${{ inputs.BROWSER || 'chrome' }}
+          CYPRESS_HEADED: 'true'
         run: |
           echo "::add-mask::$IRCTC_USERNAME"
           echo "::add-mask::$IRCTC_PASSWORD"
           npm run prepare
-          npm run book
+          xvfb-run -a npm run book
 
       - name: Upload failure screenshots
         if: failure()
