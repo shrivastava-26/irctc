@@ -593,21 +593,7 @@ export default function JourneyEditor({
               </Grid>
             </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <Controller
-                  name="executionMode"
-                  control={control}
-                  render={({ field }) => (
-                    <FormControl fullWidth>
-                      <InputLabel>Mode</InputLabel>
-                      <Select {...field} label="Mode">
-                        <MenuItem value="NOW">Run Now</MenuItem>
-                        <MenuItem value="SCHEDULED">Schedule for Later</MenuItem>
-                      </Select>
-                    </FormControl>
-                  )}
-                />
-              </Grid>
+              
             </Grid>
           </AccordionDetails>
         </Accordion>
