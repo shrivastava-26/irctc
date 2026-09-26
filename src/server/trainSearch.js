@@ -4,9 +4,21 @@ const CACHE = new Map()
 
 function parseJourneyDate(raw) {
   const value = String(raw || '').trim()
-  const match = /^(\\d{2})\/(\\d{2})\/(\\d{4})$/.exec(value)
-  if (!match) throw new Error('date must use DD/MM/YYYY')
-  const [, day, month, year] = match
+  let day
+  let month
+  let year
+
+  const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+
+  if (ddmmyyyy) {
+    ;[, day, month, year] = ddmmyyyy
+  } else if (iso) {
+    ;[, year, month, day] = iso
+  } else {
+    throw new Error('date must use DD/MM/YYYY or YYYY-MM-DD')
+  }
+
   const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
   if (
     parsed.getUTCFullYear() !== Number(year) ||
@@ -27,10 +39,12 @@ function normalizeStationCode(value, field) {
 function normalizeTrain(raw) {
   if (!raw) return null
   const trainNumber = String(raw.trainNumber || raw.number || '').trim()
-  if (!/^\\d{5}$/.test(trainNumber)) return null
+  if (!/^\d{5}$/.test(trainNumber)) return null
+
   const availableClasses = Array.isArray(raw.availableClasses)
     ? raw.availableClasses.map(value => String(value).toUpperCase())
     : []
+
   return {
     trainNumber,
     trainName: String(raw.trainName || raw.name || 'Unknown Train').trim(),
@@ -52,8 +66,13 @@ async function searchTrains({ from, to, date, travelClass, fetchImpl = globalThi
   const classCode = travelClass ? String(travelClass).trim().toUpperCase() : ''
   const key = [fromCode, toCode, isoDate, classCode].join('|')
   const cached = CACHE.get(key)
+
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return { trains: cached.trains, cached: true }
+  }
+
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('Train search provider is unavailable')
   }
 
   const baseUrl = process.env.TRAIN_SEARCH_API_URL || DEFAULT_API_URL
@@ -63,7 +82,10 @@ async function searchTrains({ from, to, date, travelClass, fetchImpl = globalThi
   url.searchParams.set('date', isoDate)
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.TRAIN_SEARCH_TIMEOUT_MS || 8000))
+  const timeout = setTimeout(
+    () => controller.abort(),
+    Number(process.env.TRAIN_SEARCH_TIMEOUT_MS || 8000),
+  )
 
   let response
   try {
@@ -72,7 +94,11 @@ async function searchTrains({ from, to, date, travelClass, fetchImpl = globalThi
       signal: controller.signal,
     })
   } catch (error) {
-    throw new Error(error.name === 'AbortError' ? 'Train search timed out' : 'Train search provider unavailable')
+    throw new Error(
+      error && error.name === 'AbortError'
+        ? 'Train search timed out'
+        : 'Train search provider unavailable',
+    )
   } finally {
     clearTimeout(timeout)
   }
@@ -93,9 +119,17 @@ async function searchTrains({ from, to, date, travelClass, fetchImpl = globalThi
     .filter(train => {
       if (seen.has(train.trainNumber)) return false
       seen.add(train.trainNumber)
-      return !classCode || train.availableClasses.length === 0 || train.availableClasses.includes(classCode)
+      return (
+        !classCode ||
+        train.availableClasses.length === 0 ||
+        train.availableClasses.includes(classCode)
+      )
     })
-    .sort((a, b) => String(a.departureTime || '99:99').localeCompare(String(b.departureTime || '99:99')))
+    .sort((a, b) =>
+      String(a.departureTime || '99:99').localeCompare(
+        String(b.departureTime || '99:99'),
+      ),
+    )
 
   CACHE.set(key, { at: Date.now(), trains })
   return { trains, cached: false }
