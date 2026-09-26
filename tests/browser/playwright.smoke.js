@@ -10,6 +10,7 @@ const {
 ;(async () => {
   const requested = String(process.env.BROWSER_CHANNEL || 'chromium').trim().toLowerCase()
   const channel = requested === 'chromium' ? undefined : requested
+  const expectedSessionBrowser = requested === 'msedge' ? 'edge' : requested
 
   const browser = await chromium.launch({
     ...(channel ? { channel } : {}),
@@ -31,7 +32,7 @@ const {
 
   const session = await launchSession({ request, headless: true })
   try {
-    assert.equal(session.browser, requested)
+    assert.equal(session.browser, expectedSessionBrowser)
     assert.equal(session.userDataDir, userDataDir)
     assert.equal(session.page.isClosed(), false)
   } finally {
