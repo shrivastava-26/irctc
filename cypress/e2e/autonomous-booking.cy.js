@@ -362,21 +362,55 @@ describe('IRCTC — Autonomous Booking Engine', () => {
         .should('be.visible')
         .click()
 
-      const targetMonth = 'November'
-      const targetYear = '2026'
+      const [day, monthNumber, year] = String(request.travelDate).split('/')
+      const monthNames = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ]
+      const targetMonth = monthNames[Number(monthNumber) - 1]
+      const targetYear = String(year)
+      const targetDay = String(Number(day))
 
-      const moveToTargetMonth = () => {
+      if (!targetMonth || !targetYear || !targetDay) {
+        throw new Error('Invalid travelDate: expected DD/MM/YYYY')
+      }
+
+      const moveToTargetMonth = (attempt = 0) => {
+        if (attempt > 24) {
+          throw new Error(
+            'Could not navigate the IRCTC calendar to ' +
+              targetMonth +
+              ' ' +
+              targetYear,
+          )
+        }
+
         cy.get('button[aria-label="Select travel date"]', { timeout: 10000 }).then(
           ($button) => {
             const calendarText = $button.text().replace(/\s+/g, ' ')
-            if (calendarText.includes(targetMonth + targetYear)) return
+            if (
+              calendarText.includes(targetMonth) &&
+              calendarText.includes(targetYear)
+            ) {
+              return
+            }
 
             cy.wrap($button)
               .find('a')
               .last()
               .click()
 
-            return cy.wait(50).then(moveToTargetMonth)
+            return cy.wait(25).then(() => moveToTargetMonth(attempt + 1))
           },
         )
       }
@@ -386,7 +420,7 @@ describe('IRCTC — Autonomous Booking Engine', () => {
       cy.get('button[aria-label="Select travel date"] table a:visible', {
         timeout: 10000,
       })
-        .filter((_, el) => String(Cypress.$(el).text()).trim() === '26')
+        .filter((_, el) => String(Cypress.$(el).text()).trim() === targetDay)
         .first()
         .click()
 
