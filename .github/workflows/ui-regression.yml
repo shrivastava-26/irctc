@@ -1,0 +1,50 @@
+name: UI regression and sanity
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ui-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Build UI
+        run: npm --prefix ui run build
+
+      - name: UI source sanity checks
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const accounts = fs.readFileSync('ui/src/components/AccountsTab.jsx', 'utf8')
+          const book = fs.readFileSync('ui/src/components/BookTab.jsx', 'utf8')
+          const editor = fs.readFileSync('ui/src/components/JourneyEditor.jsx', 'utf8')
+          const dialog = fs.readFileSync('ui/src/components/AutomationDialog.jsx', 'utf8')
+
+          const forbiddenWarning = 'This MVP stores usernames and passwords in browser local storage.'
+          if (accounts.includes(forbiddenWarning)) throw new Error('Accounts security warning header still exists')
+          if (!book.includes('<Checkbox')) throw new Error('Journey selection checkbox is missing')
+          if (!book.includes('onStart(selectedJourneyIds)')) throw new Error('Selected journey IDs are not passed to automation')
+          if ((editor.match(/replace\(\/\\D\/g, ''\)/g) || []).length === 0) throw new Error('Train number sanitization is missing')
+          if (!dialog.includes('Promise.allSettled')) throw new Error('Automation polling regression: request fan-out is not guarded')
+          if (!dialog.includes('setTimeout(poll, 1200)')) throw new Error('Automation polling regression: recursive timeout missing')
+          NODE
