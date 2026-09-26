@@ -27,7 +27,7 @@ const {
     credentialsReference: 'playwright-smoke-' + requested,
     browser: requested,
   }
-  const userDataDir = profileDir(request, requested)
+  const userDataDir = profileDir(request, expectedSessionBrowser)
   fs.rmSync(userDataDir, { recursive: true, force: true })
 
   const session = await launchSession({ request, headless: true })
