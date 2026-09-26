@@ -18,7 +18,7 @@ app.use(express.json({ limit: '1mb' }))
 
 // Keep the existing API paths compatible with both Vite dev proxy and the production SPA.
 app.use((req, res, next) => {
-  if (req.url === '/api' || req.url.startsWith('/api/')) req.url = req.url.replace(/^\\/api/, '') || '/'
+  if (req.url === '/api' || req.url.startsWith('/api/')) req.url = req.url.slice(4) || '/'
   next()
 })
 
