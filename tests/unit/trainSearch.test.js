@@ -7,8 +7,9 @@ const {
   searchTrains,
 } = require('../../src/server/trainSearch')
 
-test('normalizes DD/MM/YYYY to ISO date', () => {
+test('normalizes supported journey date formats to ISO date', () => {
   assert.equal(parseJourneyDate('05/10/2026'), '2026-10-05')
+  assert.equal(parseJourneyDate('2026-10-05'), '2026-10-05')
 })
 
 test('rejects invalid station codes and invalid dates', () => {
@@ -20,7 +21,7 @@ test('normalizes and filters train data by requested class', async () => {
   const result = await searchTrains({
     from: 'NDLS',
     to: 'HWH',
-    date: '05/10/2026',
+    date: '2026-10-05',
     travelClass: '3A',
     fetchImpl: async url => {
       assert.match(String(url), /from=NDLS/)
@@ -71,13 +72,13 @@ test('returns cached results for the same route/date/class key', async () => {
   await searchTrains({
     from: 'NDLS',
     to: 'HWH',
-    date: '06/10/2026',
+    date: '2026-10-06',
     fetchImpl,
   })
   await searchTrains({
     from: 'NDLS',
     to: 'HWH',
-    date: '06/10/2026',
+    date: '2026-10-06',
     fetchImpl,
   })
   assert.equal(calls, 1)
