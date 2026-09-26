@@ -10,7 +10,7 @@ function loadLocalWorkerEnv() {
   if (!fs.existsSync(file)) return
 
   const raw = fs.readFileSync(file, 'utf8')
-  for (const line of raw.split(/\\r?\\n/)) {
+  for (const line of raw.split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
 
