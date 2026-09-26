@@ -5,9 +5,11 @@ const CredentialManager = require('../security/CredentialManager')
 const { runBooking, runMock } = require('../engine/playwrightRunner')
 const JobStore = require('../persistence/JobStore')
 const { Job } = require('../models/Job')
+const { JourneyWorkerPool } = require('./JourneyWorkerPool')
 
 let recovered = false
 const activeJobs = new Set()
+const workerPool = JourneyWorkerPool.fromEnvironment()
 
 function preparationWindowMs() {
   const configured = Number(process.env.BOOKING_PREPARATION_WINDOW_MS)
@@ -53,10 +55,16 @@ async function execute(job) {
   if (persisted?.status === 'COMPLETED') return
 
   activeJobs.add(job.id)
-  job.markRunning()
-  JobStore.save(job)
+  let releaseWorker = null
 
   try {
+    job.addLog('[SCHEDULER] Waiting for an execution slot for account ' + workerPool.accountKey(job) + '.')
+    releaseWorker = await workerPool.acquire(job, stats => {
+      job.addLog('[SCHEDULER] Execution slot acquired. active=' + stats.concurrency.active + '/' + stats.concurrency.maxConcurrent + ', queued=' + stats.concurrency.queued + '.')
+    })
+
+    job.markRunning()
+    JobStore.save(job)
     let result
 
     if (job.request.isMock) {
@@ -84,6 +92,7 @@ async function execute(job) {
     job.fail(error.message)
   } finally {
     JobStore.save(job)
+    releaseWorker?.()
     activeJobs.delete(job.id)
   }
 }
