@@ -1,5 +1,5 @@
-import React from 'react'
-import { Box, Paper, Stack, Typography, Button } from '@mui/material'
+import React, { useEffect, useMemo } from 'react'
+import { Box, Paper, Stack, Typography, Button, Checkbox, FormControlLabel } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 
 export default function BookTab({
@@ -8,9 +8,33 @@ export default function BookTab({
   journeys,
   onStart,
   activeJobsCount,
+  selectedJourneyIds = [],
+  onSelectionChange,
   onOpenDialog,
 }) {
   const selectedAcc = accounts.find(account => account.id === selectedAccountId)
+  const selectedSet = useMemo(() => new Set(selectedJourneyIds.map(String)), [selectedJourneyIds])
+
+  useEffect(() => {
+    const validIds = new Set(journeys.map(journey => String(journey.id)))
+    const cleaned = selectedJourneyIds.filter(id => validIds.has(String(id)))
+    if (cleaned.length !== selectedJourneyIds.length) {
+      onSelectionChange?.(cleaned)
+    }
+  }, [journeys, selectedJourneyIds, onSelectionChange])
+
+  const toggleJourney = (id) => {
+    const key = String(id)
+    const next = selectedSet.has(key)
+      ? selectedJourneyIds.filter(item => String(item) !== key)
+      : selectedJourneyIds.concat(id)
+    onSelectionChange?.(next)
+  }
+
+  const selectAll = () => onSelectionChange?.(journeys.map(journey => journey.id))
+  const clearAll = () => onSelectionChange?.([])
+
+  const selectedCount = selectedJourneyIds.length
 
   return (
     <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto', minWidth: 0 }}>
@@ -43,9 +67,23 @@ export default function BookTab({
         mb: 1.5,
         flexWrap: 'wrap',
       }}>
-        <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
-          READY JOURNEYS
-        </Typography>
+        <Box>
+          <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
+            READY JOURNEYS
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Select the journey(s) you want to automate.
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 0.5, width: { xs: '100%', sm: 'auto' }, justifyContent: 'flex-end' }}>
+          <Button variant="text" size="small" onClick={selectAll} disabled={journeys.length === 0}>
+            SELECT ALL
+          </Button>
+          <Button variant="text" size="small" onClick={clearAll} disabled={selectedCount === 0}>
+            CLEAR
+          </Button>
+        </Box>
 
         {activeJobsCount > 0 && (
           <Button
@@ -96,7 +134,8 @@ export default function BookTab({
                 {(journey.passengers && journey.passengers.length) || 0} Passenger(s)
                 {journey.upiId ? ' · UPI configured' : ''}
               </Typography>
-            </Box>
+                </Box>
+              </Box>
 
             <Typography
               variant="caption"
@@ -131,7 +170,7 @@ export default function BookTab({
           size="large"
           startIcon={<PlayArrowIcon />}
           onClick={onStart}
-          disabled={!selectedAcc || journeys.length === 0}
+          disabled={!selectedAcc || selectedCount === 0}
           sx={{
             maxWidth: 420,
             px: 4,
@@ -142,6 +181,16 @@ export default function BookTab({
           START AUTOMATION
         </Button>
       </Box>
+
+      {journeys.length > 0 && (
+        <Typography variant="caption" color={selectedCount > 0 ? 'text.secondary' : 'warning.main'} sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+          {selectedCount === 0
+            ? 'Select at least one journey before starting automation.'
+            : selectedCount === 1
+              ? '1 journey selected — only that journey will be automated.'
+              : selectedCount + ' journeys selected — all selected journeys will be automated.'}
+        </Typography>
+      )}
     </Box>
   )
 }

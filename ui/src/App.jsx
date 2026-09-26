@@ -27,6 +27,7 @@ export default function App() {
   const [journeys, setJourneys] = useState([])
   const [activeJobs, setActiveJobs] = useState([])
   const [showAutomationDialog, setShowAutomationDialog] = useState(false)
+  const [selectedJourneyIds, setSelectedJourneyIds] = useState([])
 
   useEffect(() => {
     const loadedAccounts = loadAccounts().map(account => ({
@@ -74,9 +75,13 @@ export default function App() {
   const handleJourneysSave = (nextJourneys) => {
     setJourneys(nextJourneys)
     saveJourneys(nextJourneys)
+    const validIds = new Set(nextJourneys.map(journey => String(journey.id)))
+    setSelectedJourneyIds(prev => prev.filter(id => validIds.has(String(id))))
   }
 
-  const startAutomation = async () => {
+  const startAutomation = async (selectedIds = []) => {
+    const selectedIdSet = new Set(selectedIds.map(String))
+    const journeysToAutomate = journeys.filter(journey => selectedIdSet.has(String(journey.id)))
     const account = accounts.find(item => String(item.id) === String(selectedAccountId))
 
     if (!account) {
@@ -91,6 +96,11 @@ export default function App() {
 
     if (journeys.length === 0) {
       toast.error('No journeys available to run.')
+      return
+    }
+
+    if (journeysToAutomate.length === 0) {
+      toast.error('Select at least one journey to automate.')
       return
     }
 
@@ -124,7 +134,7 @@ export default function App() {
     const newJobIds = []
     let started = 0
 
-    for (const journey of journeys) {
+    for (const journey of journeysToAutomate) {
       const payload = {
         credentialsReference: account.username,
         source: String(journey.source || '').toUpperCase(),
@@ -213,6 +223,8 @@ export default function App() {
             selectedAccountId={selectedAccountId}
             journeys={journeys}
             onStart={startAutomation}
+            selectedJourneyIds={selectedJourneyIds}
+            onSelectionChange={setSelectedJourneyIds}
             activeJobsCount={activeJobs.length}
             onOpenDialog={() => setShowAutomationDialog(true)}
           />
