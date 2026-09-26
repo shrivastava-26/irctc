@@ -89,7 +89,7 @@ function normalize(data) {
 
   return {
     credentialsReference: data.credentialsReference,
-    executionTarget: String(data.executionTarget || 'API').toUpperCase(),
+    executionTarget: String(data.executionTarget || 'LOCAL').toUpperCase(),
     entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
     source: String(data.source).toUpperCase(),
     destination: String(data.destination).toUpperCase(),
