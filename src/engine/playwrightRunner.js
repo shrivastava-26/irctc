@@ -525,7 +525,7 @@ async function runBooking(job, credentials, onEvent) {
     )
   } finally {
     if (session) {
-      if (request.debugMode) {
+      if (request.debugMode && request.paymentPreference?.method !== 'EWALLET') {
         const tracePath = path.join(ARTIFACTS_DIR, job.id, 'playwright-trace.zip')
         fs.mkdirSync(path.dirname(tracePath), { recursive: true })
         await session.context.tracing.stop({ path: tracePath }).catch(() => {})
@@ -547,6 +547,12 @@ async function finalizeFailure(jobId, state, error, startedAt, onEvent, metadata
   fs.mkdirSync(dir, { recursive: true })
 
   if (session?.page) {
+    // Never persist secrets in failure screenshots. Clear visible password inputs
+    // before capturing the page; the browser session is discarded immediately after.
+    await session.page.locator('input[type="password"]:visible').evaluateAll(inputs => {
+      for (const input of inputs) input.value = ''
+    }).catch(() => {})
+
     await session.page.screenshot({
       path: path.join(dir, 'failure.png'),
       fullPage: true,

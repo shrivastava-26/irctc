@@ -6,6 +6,11 @@ const BookingRequest = require('../../src/models/BookingRequest')
 const { orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
 const { normalizeSurface, detectRuntimeSurfaceFromUrl, parseTravelDate, normalizeAvailability, availabilitySatisfies, parsePnr } = require('../../src/engine/irctc/utils')
 
+test('production IRCTC adapters load without syntax errors', () => {
+  assert.ok(require('../../src/engine/irctc/NewIRCTCAdapter'))
+  assert.ok(require('../../src/engine/irctc/LegacyIRCTCAdapter'))
+})
+
 test('surface model supports Auto, New, Legacy and runtime handoff', () => {
   assert.equal(normalizeSurface(undefined), 'AUTO')
   assert.equal(normalizeSurface('new'), 'NEW')

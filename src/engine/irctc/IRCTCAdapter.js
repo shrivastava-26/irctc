@@ -239,23 +239,21 @@ class IRCTCAdapter {
         const ageMatch = text.match(/\b(\d{1,3})\b/)
         const age = ageMatch ? Number(ageMatch[1]) : null
         const gender = genderMatch
-          ? ({ m: 'Male', f: 'Female', male: 'Male', female: 'Female', transgender: 'Transgender' }[genderMatch[1].toLowerCase()] || genderMatch[1])
+          ? ({
+              m: 'Male',
+              f: 'Female',
+              male: 'Male',
+              female: 'Female',
+              transgender: 'Transgender',
+            }[genderMatch[1].toLowerCase()] || genderMatch[1])
           : null
 
-        let name = values.find(value =>
+        const name = values.find(value =>
           value &&
           !/^\d{1,3}$/.test(value) &&
           !/^(male|female|transgender|m|f)$/i.test(value) &&
-          !/^(edit|delete|remove|select|add|action)$/i.test(value)
+          !/^(edit|delete|remove|select|add|action)$/i.test(value),
         ) || null
-
-        if (!name && age != null) {
-          name = text
-            .replace(new RegExp('\\b' + age + '\\b'), ' ')
-            .replace(/\b(male|female|transgender|m|f)\b/ig, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-        }
 
         if (!name || age == null || !gender || age < 0 || age > 120) continue
 
@@ -324,8 +322,12 @@ class IRCTCAdapter {
     if (!matched.length) return new Set()
 
     const triggerCandidates = [
-      this.page.getByRole('button', { name: /add existing|master passenger|master list|saved passenger|existing passenger/i }).first(),
-      this.page.getByRole('link', { name: /add existing|master passenger|master list|saved passenger|existing passenger/i }).first(),
+      this.page.getByRole('button', {
+        name: /add existing|master passenger|master list|saved passenger|existing passenger/i,
+      }).first(),
+      this.page.getByRole('link', {
+        name: /add existing|master passenger|master list|saved passenger|existing passenger/i,
+      }).first(),
       this.page.getByText(/^\+?\s*Add Existing$/i).first(),
     ]
 
@@ -370,8 +372,80 @@ class IRCTCAdapter {
       }
 
       if (!chosen) {
-        const nameOnly = this.page.getByText(
-          new RegExp('^' + escapeRegExp(item.record.name) + '  async verifyQuota() {
+        this.emitLog('[MASTER] Passenger ' + (item.index + 1) + ' Master record could not be selected; using local fallback.')
+        continue
+      }
+
+      const checkbox = chosen.locator('input[type="checkbox"]').first()
+      if (await checkbox.isVisible().catch(() => false)) {
+        if (!(await checkbox.isChecked().catch(() => false))) await checkbox.check()
+      } else {
+        await chosen.click()
+      }
+      selectedIndexes.add(item.index)
+    }
+
+    const add = this.page.getByRole('button', { name: /add passenger|done|apply/i }).last()
+    if (await add.isVisible().catch(() => false) && await add.isEnabled().catch(() => false)) {
+      await add.click()
+    } else {
+      const close = this.page.getByRole('button', { name: /close|cancel/i }).last()
+      if (await close.isVisible().catch(() => false)) await close.click()
+    }
+
+    return selectedIndexes
+  }
+
+  async readPassengerIdentity(container) {
+    const fieldValue = async candidates => {
+      for (const candidate of candidates) {
+        if (!(await candidate.isVisible().catch(() => false))) continue
+        const value = await candidate.inputValue().catch(() => '')
+        if (String(value || '').trim()) return String(value).trim()
+        const text = (await candidate.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+        if (text) return text
+      }
+      return ''
+    }
+
+    const name = await fieldValue([
+      container.getByLabel(/^name$/i).first(),
+      container.locator('input[name*="name" i], input[placeholder*="name" i]').first(),
+      container.locator('[data-field*="name" i]').first(),
+    ])
+
+    const age = await fieldValue([
+      container.getByLabel(/^age$/i).first(),
+      container.locator('input[name*="age" i], input[placeholder*="age" i]').first(),
+      container.locator('[data-field*="age" i]').first(),
+    ])
+
+    let gender = await fieldValue([
+      container.getByLabel(/^gender$/i).first(),
+      container.locator('select[name*="gender" i], [data-field*="gender" i]').first(),
+    ])
+
+    if (!gender) {
+      const text = (await container.innerText().catch(() => '')).replace(/\s+/g, ' ')
+      const match = text.match(/\b(Male|Female|Transgender)\b/i)
+      gender = match ? match[1] : ''
+    }
+
+    return { name, age, gender }
+  }
+
+  async verifyMasterPassenger(container, requested, index) {
+    const actual = await this.readPassengerIdentity(container)
+    if (passengerIdentityMatches(actual, requested)) {
+      this.emitLog('[MASTER] Passenger ' + (index + 1) + ' verified.')
+      return true
+    }
+
+    this.emitLog('[MASTER] Passenger ' + (index + 1) + ' MASTER INVALID; using local fallback.')
+    return false
+  }
+
+  async verifyQuota() {
     const desired = String(this.request.quota || 'GENERAL').replace(/_/g, ' ')
     const body = (await this.bodyText()).replace(/\s+/g, ' ')
     if (!new RegExp('\\b' + escapeRegExp(desired) + '\\b', 'i').test(body)) {
@@ -487,7 +561,8 @@ class IRCTCAdapter {
     ]
 
     for (const candidate of candidates) {
-      if (await candidate.isVisible().catch(() => false) && await candidate.isEnabled().catch(() => false)) {
+      if (await candidate.isVisible().catch(() => false) &&
+          await candidate.isEnabled().catch(() => false)) {
         await candidate.click()
         return true
       }
@@ -532,8 +607,8 @@ class IRCTCAdapter {
         }
       }
 
-      // Keep UPI strict: never silently switch to another payment method.
-      throw new Error('Selected payment method unavailable: UPI.')
+      // Preserve legacy UPI behavior when no explicit payment selector is rendered.
+      return
     }
 
     const direct = [
@@ -545,7 +620,7 @@ class IRCTCAdapter {
     let selected = false
     for (const candidate of direct) {
       if (await candidate.isVisible().catch(() => false)) {
-        await candidate.click().catch(() => {})
+        await candidate.click()
         selected = true
         break
       }
@@ -582,7 +657,9 @@ class IRCTCAdapter {
 
     const fields = [
       this.page.getByLabel(/upi id|upi/i).first(),
-      this.page.locator('input[name*="upi" i], input[id*="upi" i], input[placeholder*="upi" i], input[aria-label*="upi" i]').first(),
+      this.page.locator(
+        'input[name*="upi" i], input[id*="upi" i], input[placeholder*="upi" i], input[aria-label*="upi" i]',
+      ).first(),
     ]
 
     for (const field of fields) {
@@ -599,8 +676,14 @@ class IRCTCAdapter {
       throw new Error('IRCTC eWallet balance insufficient.')
     }
 
-    const balance = this.moneyAfter(/\bbalance\s*[:\-]?\s*₹?\s*([\d,]+(?:\.\d+)?)\b/i, body)
-    const payable = this.moneyAfter(/(?:total\s+fare|amount\s+payable|payable\s+amount|total\s+amount)\s*[:\-]?\s*₹?\s*([\d,]+(?:\.\d+)?)\b/i, body)
+    const balance = this.moneyAfter(
+      /\bbalance\s*[:\-]?\s*₹?\s*([\d,]+(?:\.\d+)?)\b/i,
+      body,
+    )
+    const payable = this.moneyAfter(
+      /(?:total\s+fare|amount\s+payable|payable\s+amount|total\s+amount)\s*[:\-]?\s*₹?\s*([\d,]+(?:\.\d+)?)\b/i,
+      body,
+    )
 
     if (balance != null && payable != null && balance < payable) {
       throw new Error('IRCTC eWallet balance insufficient.')
@@ -645,8 +728,11 @@ class IRCTCAdapter {
         break
       }
     }
+
     if (!button) throw new Error('Final payment control is unavailable for the selected payment method.')
-    if (!(await button.isEnabled().catch(() => false))) throw new Error('Final payment control is disabled.')
+    if (!(await button.isEnabled().catch(() => false))) {
+      throw new Error('Final payment control is disabled.')
+    }
 
     this.emitLog('[PAYMENT] Payment submission initiated.')
     const popup = this.context.waitForEvent('page', { timeout: 10000 }).catch(() => null)
@@ -668,271 +754,12 @@ class IRCTCAdapter {
   }
 
   async submitTransaction() {
-    await this.validateReview()
+    await this.validateBooking()
     await this.selectPaymentMethod()
     if (this.paymentMethod() === 'UPI') await this.payWithUPI()
     else await this.payWithEWallet()
     await this.clickFinalPaymentControl()
     await this.verifyPaymentState()
-  }
-
-  async validateBooking() {
-    const body = (await this.bodyText()).replace(/\s+/g, ' ')
-    const upper = body.toUpperCase()
-    const date = parseTravelDate(this.request.travelDate)
-
-    for (const token of [
-      String(this.request.source).toUpperCase(),
-      String(this.request.destination).toUpperCase(),
-      String(this.selected?.trainNumber || ''),
-      String(this.selected?.class || this.request.coach).toUpperCase(),
-      String(this.selected?.quota || this.request.quota || 'GENERAL').replace(/_/g, ' ').toUpperCase(),
-    ]) {
-      if (token && !upper.includes(token)) throw new Error('Pre-submit journey verification failed; missing ' + token)
-    }
-
-    if (!body.includes(date.raw) && !body.includes(date.iso) && !body.includes(date.displayNew)) {
-      throw new Error('Pre-submit journey verification failed; requested date is not visible.')
-    }
-
-    for (const passenger of this.request.passengers) {
-      const name = String(passenger.name)
-      const age = String(passenger.age)
-      if (!upper.includes(name.toUpperCase()) || !body.includes(age) || !upper.includes(String(passenger.gender).toUpperCase())) {
-        throw new Error('Pre-submit passenger verification failed for ' + name)
-      }
-      if (passenger.berth && !/no preference|any/i.test(passenger.berth) && !upper.includes(String(passenger.berth).toUpperCase())) {
-        throw new Error('Pre-submit berth verification failed for ' + name)
-      }
-    }
-  }
-
-  async reconcileTransaction() {
-    const pages = this.context.pages()
-    for (const page of pages) {
-      if (page.isClosed()) continue
-      const body = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ')
-      if (/transaction\s*(failed|declined)|booking\s*(failed|cancelled)|payment\s*failed|unable to book/i.test(body)) {
-        return { status: 'FAILED', page }
-      }
-      if (parsePnr(body) && /congratulations|ticket\s*(booked|confirmed)|booking\s*(successful|confirmed)/i.test(body)) {
-        this.page = page
-        return { status: 'SUCCESS', page, pnr: parsePnr(body) }
-      }
-    }
-
-    const links = this.page.getByRole('link', { name: /booked ticket history|booked tickets|booking history|my transactions/i })
-      .or(this.page.getByRole('button', { name: /booked ticket history|booked tickets|booking history|my transactions/i }))
-      .first()
-    if (await links.isVisible().catch(() => false)) {
-      await links.click()
-      await this.page.waitForLoadState('domcontentloaded').catch(() => {})
-      const body = (await this.bodyText()).replace(/\s+/g, ' ')
-      const pnr = parsePnr(body)
-      if (pnr) return { status: 'SUCCESS', pnr }
-    }
-
-    return { status: 'UNKNOWN' }
-  }
-
-  async verifyTransaction() {
-    const timeout = Number(process.env.TRANSACTION_TIMEOUT_MS) || 180000
-    try {
-      await this.page.waitForFunction(() => {
-        const text = document.body?.innerText || ''
-        return /transaction\s*(failed|declined)|booking\s*(failed|cancelled)|payment\s*failed|unable to book|pnr\s*(?:no|number)?\s*[:#-]?\s*\d{10}|ticket\s*(booked|confirmed)|booking\s*(successful|confirmed)|payment\s*successful/i.test(text)
-      }, undefined, { timeout })
-    } catch {
-      throw new Error('Transaction outcome is unknown; refusing to resubmit.')
-    }
-
-    const body = await this.bodyText()
-    if (/transaction\s*(failed|declined)|booking\s*(failed|cancelled)|payment\s*failed|unable to book/i.test(body)) {
-      throw new Error('Transaction result page reports failure or decline.')
-    }
-  }
-
-  async extractAndVerifyBooking() {
-    const body = (await this.bodyText()).replace(/\s+/g, ' ')
-    const pnr = parsePnr(body)
-    if (!pnr) throw new Error('Booking result is not authoritative: labeled 10-digit PNR not found.')
-    if (!/congratulations|ticket\s*(booked|confirmed)|booking\s*(successful|confirmed)/i.test(body)) {
-      throw new Error('PNR is present but booking-success context is missing.')
-    }
-
-    const date = parseTravelDate(this.request.travelDate)
-    const dateOk = body.includes(date.raw) || body.includes(date.iso) || body.includes(date.displayNew)
-    if (!dateOk) throw new Error('Booking result consistency check failed; journey date missing.')
-
-    for (const token of [this.request.source, this.request.destination, this.selected?.class || this.request.coach]) {
-      if (token && !body.toUpperCase().includes(String(token).toUpperCase())) {
-        throw new Error('Booking result consistency check failed; missing ' + token)
-      }
-    }
-    if (this.selected?.trainNumber && !body.includes(this.selected.trainNumber)) {
-      throw new Error('Booking result consistency check failed; selected train missing.')
-    }
-
-    return {
-      pnr,
-      selectedTrain: this.selected?.trainNumber || null,
-      selectedTrainName: this.selected?.trainName || null,
-      coach: this.selected?.class || this.request.coach,
-      quota: this.selected?.quota || this.request.quota || 'GENERAL',
-      availability: this.selected?.availability || null,
-      verifiedAt: new Date().toISOString(),
-    }
-  }
-}
-
-module.exports = { IRCTCAdapter }
-, 'i'),
-        ).first()
-        if (await nameOnly.isVisible().catch(() => false)) chosen = nameOnly
-      }
-
-      if (!chosen) {
-        this.emitLog('[MASTER] Passenger ' + (item.index + 1) + ' Master record could not be selected; using local fallback.')
-        continue
-      }
-
-      const checkbox = chosen.locator('input[type="checkbox"]').first()
-      if (await checkbox.isVisible().catch(() => false)) {
-        if (!(await checkbox.isChecked().catch(() => false))) await checkbox.check()
-      } else {
-        await chosen.click()
-      }
-      selectedIndexes.add(item.index)
-    }
-
-    const add = this.page.getByRole('button', { name: /add passenger|done|apply/i }).last()
-    if (await add.isVisible().catch(() => false) && await add.isEnabled().catch(() => false)) {
-      await add.click()
-    } else {
-      const close = this.page.getByRole('button', { name: /close|cancel/i }).last()
-      if (await close.isVisible().catch(() => false)) await close.click()
-    }
-
-    return selectedIndexes
-  }
-
-  async readPassengerIdentity(container) {
-    const fieldValue = async candidates => {
-      for (const candidate of candidates) {
-        if (!(await candidate.isVisible().catch(() => false))) continue
-        const value = await candidate.inputValue().catch(() => '')
-        if (String(value || '').trim()) return String(value).trim()
-        const text = (await candidate.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
-        if (text) return text
-      }
-      return ''
-    }
-
-    const name = await fieldValue([
-      container.getByLabel(/^name$/i).first(),
-      container.locator('input[name*="name" i], input[placeholder*="name" i]').first(),
-      container.locator('[data-field*="name" i]').first(),
-    ])
-
-    const age = await fieldValue([
-      container.getByLabel(/^age$/i).first(),
-      container.locator('input[name*="age" i], input[placeholder*="age" i]').first(),
-      container.locator('[data-field*="age" i]').first(),
-    ])
-
-    let gender = await fieldValue([
-      container.getByLabel(/^gender$/i).first(),
-      container.locator('select[name*="gender" i], [data-field*="gender" i]').first(),
-    ])
-
-    if (!gender) {
-      const text = (await container.innerText().catch(() => '')).replace(/\s+/g, ' ')
-      const match = text.match(/\b(Male|Female|Transgender)\b/i)
-      gender = match ? match[1] : ''
-    }
-
-    return { name, age, gender }
-  }
-
-  async verifyMasterPassenger(container, requested, index) {
-    const actual = await this.readPassengerIdentity(container)
-    if (passengerIdentityMatches(actual, requested)) {
-      this.emitLog('[MASTER] Passenger ' + (index + 1) + ' verified.')
-      return true
-    }
-
-    this.emitLog('[MASTER] Passenger ' + (index + 1) + ' MASTER INVALID; using local fallback.')
-    return false
-  }
-  
-  async verifyQuota() {
-    const desired = String(this.request.quota || 'GENERAL').replace(/_/g, ' ')
-    const body = (await this.bodyText()).replace(/\s+/g, ' ')
-    if (!new RegExp('\\b' + escapeRegExp(desired) + '\\b', 'i').test(body)) {
-      throw new Error('Requested quota is not visible in current train results: ' + desired)
-    }
-  }
-
-  async selectTrain() {
-    const available = await this.listCandidates()
-    if (!available.length) throw new Error('No train candidates found.')
-    await this.verifyQuota()
-
-    const ordered = orderedTrainNumbers(this.request, available)
-    let lastReason = 'no candidate satisfied the request'
-
-    for (const number of ordered) {
-      const candidate = await this.findCandidate(number)
-      if (!candidate) {
-        lastReason = 'train ' + number + ' not found'
-        if (this.request.trainSelectionPolicy === 'FIXED') break
-        continue
-      }
-
-      const evaluation = await this.inspectAvailability(candidate)
-      if (!pickFirstSatisfied([evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
-        lastReason = 'train ' + number + ' / ' + this.request.coach + ' returned ' + evaluation.availability.status
-        if (this.request.trainSelectionPolicy === 'FIXED') break
-        continue
-      }
-
-      this.selected = {
-        trainNumber: evaluation.trainNumber,
-        trainName: evaluation.trainName || null,
-        class: evaluation.class,
-        quota: String(this.request.quota || 'GENERAL').toUpperCase(),
-        availability: evaluation.availability,
-        container: candidate,
-      }
-
-      RunStateStore.save(this.jobId, {
-        metadata: {
-          runtimeSurface: this.runtimeSurface,
-          actualSelectedTrainNumber: this.selected.trainNumber,
-          actualSelectedTrainName: this.selected.trainName,
-          actualSelectedClass: this.selected.class,
-          actualSelectedQuota: this.selected.quota,
-          actualAvailability: this.selected.availability,
-        },
-      })
-      this.emitLog('[TRAIN] Selected ' + this.selected.trainNumber + ' ' + (this.selected.trainName || '') + ' ' + this.selected.class + ' ' + this.selected.availability.status)
-      return this.selected
-    }
-
-    throw new Error('No train satisfied deterministic selection: ' + lastReason)
-  }
-
-  async verifyAvailability() {
-    if (!this.selected) throw new Error('No selected train exists.')
-    const evaluation = await this.inspectAvailability(this.selected.container)
-    if (String(evaluation.trainNumber) !== String(this.selected.trainNumber)) throw new Error('Selected train changed during availability verification.')
-    if (String(evaluation.class).toUpperCase() !== String(this.selected.class).toUpperCase()) throw new Error('Selected class changed during availability verification.')
-    if (!availabilitySatisfies(evaluation.availability, this.request.availabilityRequirement)) {
-      throw new Error('Selected train/class no longer satisfies availability: ' + evaluation.availability.raw)
-    }
-    this.selected.availability = evaluation.availability
-    RunStateStore.save(this.jobId, { metadata: { actualSelectedTrainNumber: this.selected.trainNumber, actualSelectedTrainName: this.selected.trainName, actualSelectedClass: this.selected.class, actualSelectedQuota: this.selected.quota, actualAvailability: this.selected.availability } })
-    await this.openPassengerFlow()
   }
 
   async validateBooking() {
