@@ -83,6 +83,10 @@ function preparationWindowMs() {
 
 async function runBooking(job, credentials, onEvent) {
   const request = job.request
+
+  if (String(request?.executionTarget || '').toUpperCase() !== 'LOCAL') {
+    return finalizeFailure(job.id, 'LOAD_CONFIG', 'Hosted browser execution is disabled. RAILX browser jobs must run on the local execution worker.', Date.now(), onEvent, { code: 'LOCAL_EXECUTION_REQUIRED', executionTarget: request?.executionTarget || null })
+  }
   const startedAt = Date.now()
 
   const requestErrors = BookingRequest.validate(request)
@@ -300,10 +304,10 @@ async function runBooking(job, credentials, onEvent) {
 
             const entryProblem = await candidate.detectEntryAccessProblem()
             if (entryProblem.blocked) {
-              throw new Error(
-                entryProblem.reason +
-                ' The browser reached IRCTC, but the execution network was denied before the journey form rendered.'
-              )
+              const blockedError = new Error(entryProblem.reason + ' The browser reached IRCTC, but the execution network was denied before the journey form rendered.')
+              blockedError.code = 'IRCTC_ACCESS_BLOCK'
+              blockedError.metadata = { entryHttpStatus: candidate.entryHttpStatus || null, finalUrl: session.page.url() }
+              throw blockedError
             }
 
             const visibleSurface = await candidate.detectPreSearchSurface()
@@ -329,7 +333,7 @@ async function runBooking(job, credentials, onEvent) {
             return
           } catch (error) {
             lastError = error
-            if (requestedEntry !== SURFACES.AUTO) throw error
+            if (error.code === 'IRCTC_ACCESS_BLOCK' || requestedEntry !== SURFACES.AUTO) throw error
           }
         }
 
@@ -527,6 +531,8 @@ async function runBooking(job, credentials, onEvent) {
         entrySurface: normalizeSurface(request.entrySurface),
         runtimeSurface: adapter?.runtimeSurface || SURFACES.UNKNOWN,
         recoveryMode,
+        code: error.code || null,
+        ...(error.metadata || {}),
       },
       session,
     )

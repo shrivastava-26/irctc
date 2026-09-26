@@ -43,7 +43,7 @@ function toPublicJob(job) {
       travelDate: req.travelDate,
       quota: req.quota,
       entrySurface: req.entrySurface || 'AUTO',
-      executionTarget: req.executionTarget || 'HOSTED',
+      executionTarget: req.executionTarget || 'LOCAL',
       trainSelectionPolicy: req.trainSelectionPolicy || 'FIRST_VALID',
       trainNumber: req.trainNumber,
       coach: req.coach,
@@ -80,6 +80,10 @@ app.post('/jobs', (req, res) => {
       error: 'Validation failed',
       details: errors,
     })
+  }
+
+  if (String(req.body?.executionTarget || 'LOCAL').toUpperCase() !== 'LOCAL') {
+    return res.status(409).json({ error: 'Hosted browser execution is disabled. RAILX browser jobs must run on the local execution worker.', code: 'LOCAL_EXECUTION_REQUIRED' })
   }
 
   const normalized = normalize(req.body)
