@@ -140,8 +140,38 @@ class IRCTCAdapter {
   }
 
   async detectPreSearchSurface() {
-    if (await this.page.locator('#origin').isVisible().catch(() => false)) return SURFACES.LEGACY
-    if (await this.page.getByRole('combobox', { name: 'From station' }).isVisible().catch(() => false)) return SURFACES.NEW
+    // The entry URL is the most stable signal before the journey form is
+    // rendered. IRCTC can change Angular/ARIA markup without changing the
+    // surface route, so do not require one exact DOM selector here.
+    const url = this.page.url()
+    if (/\/nget(?:\/|$)/i.test(url)) {
+      this.runtimeSurface = SURFACES.LEGACY
+      return this.runtimeSurface
+    }
+    if (/\/eticket(?:\/|$)/i.test(url)) {
+      this.runtimeSurface = SURFACES.NEW
+      return this.runtimeSurface
+    }
+
+    if (await this.page.locator('#origin').isVisible().catch(() => false)) {
+      this.runtimeSurface = SURFACES.LEGACY
+      return this.runtimeSurface
+    }
+
+    const newSurfaceSignals = [
+      this.page.getByRole('combobox', { name: /from station/i }).first(),
+      this.page.locator('input[formcontrolname="origin"]:visible').first(),
+      this.page.locator('input[name*="origin" i]:visible').first(),
+      this.page.locator('input[placeholder*="from" i]:visible').first(),
+    ]
+
+    for (const signal of newSurfaceSignals) {
+      if (await signal.isVisible().catch(() => false)) {
+        this.runtimeSurface = SURFACES.NEW
+        return this.runtimeSurface
+      }
+    }
+
     return SURFACES.UNKNOWN
   }
 
