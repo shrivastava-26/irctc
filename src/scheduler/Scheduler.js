@@ -1,5 +1,5 @@
-// Render is the control plane only. Browser execution is owned by the outbound local worker.
-// There is intentionally no hosted browser execution path.
+// Executes persisted hosted jobs. Local-target jobs are owned by the
+// outbound-polling local browser worker and are never launched on Render.
 
 const CredentialManager = require('../security/CredentialManager')
 const { runBooking, runMock } = require('../engine/playwrightRunner')
@@ -29,7 +29,10 @@ function executionStartDelayMs(scheduledAt) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve,async function schedule(job) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function schedule(job) {
   const target = String(job.request?.executionTarget || 'LOCAL').toUpperCase()
 
   if (target === 'LOCAL') {
@@ -58,6 +61,12 @@ function sleep(ms) {
 
   await execute(job)
 }
+
+async function execute(job) {
+  if (activeJobs.has(job.id)) return
+
+  const persisted = JobStore.findById(job.id)
+  if (persisted?.status === 'COMPLETED' || persisted?.request?.executionTarget === 'LOCAL') return
 
   activeJobs.add(job.id)
   let releaseWorker = null
