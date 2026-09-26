@@ -1,6 +1,6 @@
-# IRCTC Cypress automation — autonomous booking engine
+# IRCTC booking automation — Playwright production engine
 
-This repository contains a persistent, state-aware Cypress booking engine plus the legacy diagnostic specs retained for compatibility.
+This repository contains a persistent, state-aware Playwright booking engine. Cypress remains temporarily for legacy/regression compatibility.
 
 ## What is implemented
 
@@ -78,7 +78,7 @@ the UI dev server together):
 npm run start-ui
 ```
 
-Legacy flows retain their original guarded behavior. The autonomous engine can navigate the configured payment UI and waits for the authoritative transaction outcome; it does not bypass external bank/UPI authorization or security challenges.
+Legacy flows retain their original guarded behavior. The production engine uses Playwright for browser execution, supports Auto/New/Legacy IRCTC entry selection and detects the actual runtime surface after search. It does not bypass external bank/UPI authorization or security challenges.
 
 ### Troubleshooting
 
@@ -100,11 +100,11 @@ Legacy flows retain their original guarded behavior. The autonomous engine can n
 
 ## Autonomous booking engine
 
-The feature branch adds a persistent, state-aware Cypress execution path in cypress/e2e/autonomous-booking.cy.js.
+The production booking path is src/engine/playwrightRunner.js. The legacy Cypress autonomous spec remains temporarily for compatibility.
 
 Run preparation:
 
-    npm run prepare
+    npm run prepare-booking
 
 Run the current configured booking request:
 
@@ -124,4 +124,18 @@ The production workflow treats CAPTCHA/OTP as security challenges rather than at
 
 Transactional booking and payment states are reconciled before any retry. An unknown outcome is never treated as a safe failure and is never blindly resubmitted.
 
-The existing legacy specs remain in place for backward compatibility.
+The existing legacy Cypress specs remain in place for backward compatibility. Production scheduling uses the same persistent Scheduler for immediate and scheduled jobs.
+
+
+### IRCTC entry surfaces
+
+Each journey can use:
+- Auto — try the new entry and fall back to the legacy entry when the new journey form is not available.
+- New — https://www.irctc.co.in/eticket/
+- Legacy — https://www.irctc.co.in/nget/train-search
+
+After search, the engine detects the actual runtime train-list surface. A New entry can legitimately become either the New or Legacy runtime train-list flow.
+
+### Playwright browser targets
+
+The production runner supports chromium, chrome, and edge. Playwright 1.63.0 is pinned in package.json/package-lock; the branded Chrome and Edge channels are supported by Playwright.
