@@ -1,32 +1,30 @@
 const { defineConfig } = require('cypress')
+const RunStateStore = require('./src/engine/RunStateStore')
+const Telemetry = require('./src/engine/Telemetry')
 
 module.exports = defineConfig({
   projectId: '7afdkj',
-
-  defaultCommandTimeout: 120000,
-  pageLoadTimeout: 90000,
-  responseTimeout: 60000,
-  requestTimeout: 60000,
-  video: true,
+  defaultCommandTimeout: 30000,
+  pageLoadTimeout: 60000,
+  responseTimeout: 45000,
+  requestTimeout: 45000,
+  video: String(process.env.DEBUG_MODE || 'false').toLowerCase() === 'true',
   screenshotOnRunFailure: true,
 
   e2e: {
-    // chromeWebSecurity and experimentalModifyObstructiveThirdPartyCode
-    // must be in the e2e block for Cypress 13 compatibility.
     chromeWebSecurity: false,
     experimentalModifyObstructiveThirdPartyCode: true,
 
     setupNodeEvents(on, config) {
       const http = require('http')
 
-      // Post a log event to the Job Manager if JOB_ID is set.
-      // This streams live Cypress output to the UI while the job runs.
       function postJobEvent(jobId, body) {
+        if (!jobId) return
         const payload = Buffer.from(JSON.stringify(body))
         const options = {
           hostname: 'localhost',
-          port: process.env.JOB_MANAGER_PORT || 3001,
-          path: `/jobs/${jobId}/events`,
+          port: Number(process.env.JOB_MANAGER_PORT || 3001),
+          path: '/jobs/' + jobId + '/events',
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -34,63 +32,64 @@ module.exports = defineConfig({
           },
         }
         const req = http.request(options)
-        req.on('error', () => { /* non-fatal */ })
+        req.on('error', () => {})
         req.write(payload)
         req.end()
       }
 
       on('task', {
         log(message) {
-          console.log(message + '\n')
+          const safeMessage = String(message || '')
+          console.log(safeMessage + '\n')
           const jobId = process.env.JOB_ID
-          if (!jobId) return null;
-
-          postJobEvent(jobId, { type: 'LOG', message })
-
-          // Heuristics to update the Job Manager state machine based on logs
-          let state = null;
-          const msg = message.toLowerCase();
-          
-          if (msg.includes('login') || msg.includes('captcha') || msg.includes('authenticated') || msg.includes('navigating to irctc')) {
-            state = 'LOGIN';
-          } else if (msg.includes('station set') || msg.includes('search submitted')) {
-            state = 'SEARCH';
-          } else if (msg.includes('found train')) {
-            state = 'TRAIN_FOUND';
-          } else if (msg.includes('tatkal time started') || msg.includes('book now clicked')) {
-            state = 'AVAILABILITY';
-          } else if (msg.includes('filling name') || msg.includes('passenger data')) {
-            state = 'BOOKING_FORM';
-          } else if (msg.includes('navigating to review')) {
-            state = 'REVIEW';
-          } else if (msg.includes('payment') || msg.includes('pay and book') || msg.includes('upi')) {
-            state = 'PAYMENT';
-          }
-
-          if (state) {
-            postJobEvent(jobId, { type: 'STATE_CHANGED', state, message: `Transitioned to ${state}` })
-          }
-
+          postJobEvent(jobId, { type: 'LOG', message: safeMessage })
           return null
         },
-        // Used by cypress/support/commands.js: visitIrctcEntry / reportCurrentIrctcState.
-        // Logs non-sensitive page-state facts only — never credentials or payment data.
+
         reportIrctcState(state) {
-          console.log('[IRCTC-STATE]', JSON.stringify(state))
+          const safeState = state || {}
+          console.log('[IRCTC-STATE]', JSON.stringify(safeState))
+          const jobId = process.env.JOB_ID
+          postJobEvent(jobId, {
+            type: 'IRCTC_STATE',
+            state: safeState,
+          })
           return null
+        },
+
+        bookingStateLoad({ jobId }) {
+          return RunStateStore.load(jobId)
+        },
+
+        bookingStateSave({ jobId, state, phase, message, metadata }) {
+          const saved = RunStateStore.save(jobId, {
+            state,
+            phase,
+            message: message || null,
+            metadata: metadata || null,
+          })
+          postJobEvent(jobId, {
+            type: 'STATE_CHANGED',
+            state: saved.state,
+            message: message || null,
+          })
+          return saved
+        },
+
+        telemetryMark({ jobId, name, metadata }) {
+          return Telemetry.mark(jobId, name, metadata || null)
+        },
+
+        telemetrySnapshot({ jobId }) {
+          return Telemetry.snapshot(jobId)
         },
       })
 
-      // Keep browser flags compatible with both the hosted Linux runner and local Edge.
-      // Headless mode is allowed on Render; local runs can opt into headed execution
-      // with CYPRESS_HEADED=true.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium') {
-          launchOptions.args.push('--disable-blink-features=AutomationControlled')
           launchOptions.args.push('--no-sandbox')
           launchOptions.args.push('--disable-web-security')
           launchOptions.args.push('--window-size=1478,1056')
-
           if (process.env.CYPRESS_HEADED === 'true') {
             launchOptions.args.push('--start-maximized')
           }
