@@ -50,7 +50,7 @@ function runCypress(request) {
       process.env.DEBUG_MODE || (request.debugMode ? 'true' : 'false'),
   }
 
-  const browser = request.browser || process.env.CYPRESS_BROWSER || 'edge'
+  const browser = process.env.CYPRESS_BROWSER || request.browser || 'edge'
   const args = [
     'cypress',
     'run',
