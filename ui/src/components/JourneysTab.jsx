@@ -62,7 +62,7 @@ export default function JourneysTab({ journeys, onSave }) {
             {journeys.map(journey => (
               <div key={journey.id} className="railx-journey-row">
                 <div className="railx-row-grid">
-                  <Box className="railx-brand-mark" sx={{ color: 'primary.main', flexShrink: 0, width: 38, height: 38 }}>
+                  <Box className="railx-brand-mark" sx={{ width: 36, height: 36, flexShrink: 0 }}>
                     <TrainOutlinedIcon fontSize="small" />
                   </Box>
 
@@ -72,12 +72,10 @@ export default function JourneysTab({ journeys, onSave }) {
                     </div>
                     <div className="railx-route-meta">{journey.travelDate} · {journey.coach} · {journey.quota}</div>
                     <div className="railx-meta-line">
-                      <EventOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
-                      {journey.passengers?.length || 0} passenger{journey.passengers?.length === 1 ? '' : 's'}
-                      <Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>
-                      <PaymentsOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.35 }} />
-                      {journey.upiId ? 'UPI configured' : 'Payment not configured'}
-                      {journey.boardingStation ? <><Box component="span" sx={{ mx: 0.8, color: 'divider' }}>•</Box>Boarding {journey.boardingStation}</> : null}
+                      <span className="railx-meta-item"><EventOutlinedIcon sx={{ fontSize: 14 }} />{journey.passengers?.length || 0} passenger{journey.passengers?.length === 1 ? '' : 's'}</span>
+                      <span className="railx-divider-dot">•</span>
+                      <span className="railx-meta-item"><PaymentsOutlinedIcon sx={{ fontSize: 14 }} />{journey.upiId ? 'UPI configured' : 'Payment not configured'}</span>
+                      {journey.boardingStation ? <><span className="railx-divider-dot">•</span><span>Boarding {journey.boardingStation}</span></> : null}
                     </div>
                   </Box>
 

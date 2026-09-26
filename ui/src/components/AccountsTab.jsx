@@ -75,8 +75,8 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
       <GlassPanel className="railx-page-intro">
         <div className="railx-section-header" style={{ marginBottom: 0 }}>
           <Stack direction="row" spacing={1.1} alignItems="center" minWidth={0}>
-            <Box className="railx-brand-mark" sx={{ color: 'primary.main', flexShrink: 0 }}>
-              <AccountCircleOutlinedIcon />
+            <Box className="railx-brand-mark" sx={{ width: 38, height: 38, flexShrink: 0 }}>
+              <AccountCircleOutlinedIcon fontSize="small" />
             </Box>
             <Box minWidth={0}>
               <Typography className="railx-kicker">Accounts</Typography>
@@ -85,7 +85,7 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={0.8} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+          <Stack direction="row" spacing={0.7} sx={{ width: { xs: '100%', sm: 'auto' } }}>
             <Button startIcon={<FileDownloadIcon />} variant="outlined" size="small" onClick={exportBackup} sx={{ flex: { xs: 1, sm: 'none' } }}>Backup</Button>
             <Button startIcon={<AddIcon />} variant="contained" color="primary" size="small" onClick={() => handleOpen()} sx={{ flex: { xs: 1, sm: 'none' } }}>Add account</Button>
           </Stack>
@@ -93,28 +93,28 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
       </GlassPanel>
 
       <section className="railx-section" aria-label="Saved accounts">
-        {accounts.length > 0 ? (
+        {accounts.length ? (
           <div>
             {accounts.map(account => {
               const selected = String(account.id) === String(selectedAccountId)
               return (
                 <div key={account.id} className="railx-account-row">
                   <div className="railx-account-grid">
-                    <div>
-                      <div className="railx-field-label">Name</div>
-                      <div className="railx-field-value">{account.label}</div>
+                    <div className="railx-account-main">
+                      <span className="primary">{account.label}</span>
+                      <span className="railx-divider-dot">•</span>
+                      <span>{account.username}</span>
                     </div>
-                    <div>
-                      <div className="railx-field-label">Username</div>
-                      <div className="railx-field-value">{account.username}</div>
-                    </div>
-                    <div>
-                      <div className="railx-field-label">Status</div>
-                      {selected ? <StatusBadge status="READY" compact /> : <Button size="small" onClick={() => onSelect(account.id)}>Select</Button>}
-                    </div>
-                    <div className="railx-row-actions">
-                      <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpen(account)} aria-label="Edit account"><EditIcon fontSize="small" /></IconButton></Tooltip>
-                      <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDelete(account.id)} aria-label="Delete account"><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+
+                    <div className="railx-account-actions">
+                      {selected
+                        ? <StatusBadge status="READY" compact />
+                        : <Button size="small" onClick={() => onSelect(account.id)}>Select</Button>}
+
+                      <div className="railx-row-actions">
+                        <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpen(account)} aria-label="Edit account"><EditIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDelete(account.id)} aria-label="Delete account"><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -123,13 +123,13 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
           </div>
         ) : (
           <div className="railx-empty-state">
-            <AccountCircleOutlinedIcon sx={{ fontSize: 42, opacity: 0.55 }} />
+            <AccountCircleOutlinedIcon sx={{ fontSize: 40, opacity: 0.55 }} />
             <Typography variant="body2" fontWeight={750}>No accounts saved</Typography>
             <Typography variant="caption">Add an IRCTC account to enable automation.</Typography>
           </div>
         )}
 
-        <Box sx={{ mt: 1.25, pt: 1.1, borderTop: accounts.length ? '1px solid' : 0, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ mt: 0.8, pt: 1, borderTop: accounts.length ? '1px solid' : 0, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           <Typography variant="caption" color="text.secondary">Password visibility</Typography>
           <Button size="small" startIcon={showPasswords ? <VisibilityOffIcon /> : <VisibilityIcon />} onClick={() => setShowPasswords(value => !value)}>
             {showPasswords ? 'Hide passwords' : 'Show passwords'}
@@ -137,9 +137,9 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
         </Box>
 
         {showPasswords && accounts.length > 0 && (
-          <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ mt: 0.8, pt: 0.8, borderTop: '1px solid', borderColor: 'divider' }}>
             {accounts.map(account => (
-              <Box key={account.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.45, minWidth: 0 }}>
+              <Box key={account.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.35, minWidth: 0 }}>
                 <Typography variant="caption" color="text.secondary">{account.label}</Typography>
                 <Typography variant="caption" className="railx-mono" sx={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{account.password}</Typography>
               </Box>
