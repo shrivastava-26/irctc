@@ -1,132 +1,87 @@
-name: IRCTC Automation Booking
+name: IRCTC Automation
 
 on:
   push:
     branches:
       - 'main'
+      - 'feature/**'
   pull_request:
   workflow_dispatch:
     inputs:
       USERNAME:
         required: true
         type: string
-        description: "Your IRCTC Username"
+        description: "IRCTC username"
       PASSWORD:
         required: true
         type: string
-        description: "Your IRCTC Password"
-      UPI_ID:
-        required: false
+        description: "IRCTC password"
+      BOOKING_REQUEST_JSON:
+        required: true
         type: string
-        description: "Your UPI ID (e.g. yourname@paytm) — leave empty to stop at payment"
+        description: "JSON booking request without credentials"
+      BROWSER:
+        required: false
+        default: chromium
+        type: string
+        description: "Browser for explicit live run"
 
 jobs:
-  IRCTC-Booking:
+  unit:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Python setup for the CAPTCHA OCR server
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      # Set IST timezone and start CAPTCHA solver + mask secrets
-      - name: Configure timezone, install CAPTCHA solver, mask secrets
-        run: |
-          sudo timedatectl set-timezone Asia/Kolkata
-
-          pip install -r irctc-captcha-solver/requirements.txt
-
-          # Pre-load EasyOCR models (eliminates cold-start delay at booking time)
-          python3 irctc-captcha-solver/app.py ""
-
-          # Read inputs (workflow_dispatch) or fall back to secrets
-          PASSWORD="${{ inputs.PASSWORD || secrets.IRCTC_PASSWORD }}"
-          USERNAME="${{ inputs.USERNAME || secrets.IRCTC_USERNAME }}"
-          UPI_ID="${{ inputs.UPI_ID || '' }}"
-
-          # Mask all secrets from logs
-          echo "::add-mask::$PASSWORD"
-          echo "::add-mask::$USERNAME"
-          if [ -n "$UPI_ID" ]; then
-            echo "::add-mask::$UPI_ID"
-          fi
-
-          echo "PASSWORD=$PASSWORD" >> $GITHUB_ENV
-          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
-          echo "UPI_ID=$UPI_ID" >> $GITHUB_ENV
-
-      # Node.js for Cypress
-      - name: Set up Node.js 20
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      # Install Google Chrome — the only browser that bypasses IRCTC WAF
-      - name: Install Google Chrome
-        run: |
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | \
-            sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update -q
-          sudo apt-get install -y google-chrome-stable
-          google-chrome --version
-
-      # Virtual display — required for headed Chrome on Ubuntu (no physical display)
-      - name: Start Xvfb virtual display
-        run: |
-          sudo apt-get install -y xvfb
-          Xvfb :99 -screen 0 1478x1056x24 &
-          echo "DISPLAY=:99" >> $GITHUB_ENV
-
-      # Install Cypress and dependencies
-      - name: Install Cypress and dependencies
+          cache: npm
+      - name: Install dependencies
         run: npm install
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright browser smoke
+        run: npm run smoke:playwright
+      - name: Verify legacy Cypress package
+        run: node -e "console.log(require.resolve('cypress/package.json'))"
 
-      # Start CAPTCHA OCR server in background
-      - name: Start CAPTCHA OCR server (localhost:5000)
+  live-booking:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium and Xvfb
         run: |
-          python3 irctc-captcha-solver/app-server.py --host 0.0.0.0 --port 5000 &
-          # Wait for server to come up
-          timeout 60 bash -c 'until curl -sf http://localhost:5000/health; do sleep 2; done'
-          echo "[CAPTCHA SERVER] Ready."
-
-      # Run the main booking automation
-      - name: Run IRCTC Booking Automation
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb
+          npx playwright install --with-deps chromium
+      - name: Validate booking configuration
         env:
-          CYPRESS_USERNAME: ${{ env.USERNAME }}
-          CYPRESS_PASSWORD: ${{ env.PASSWORD }}
-          CYPRESS_UPI_ID: ${{ env.UPI_ID }}
-          DISPLAY: ${{ env.DISPLAY }}
-        run: |
-          npx cypress run \
-            --browser chrome \
-            --headed \
-            --spec "cypress/e2e/irctc.cy.js" \
-            --env USERNAME="$USERNAME",PASSWORD="$PASSWORD",UPI_ID="$UPI_ID",MANUAL_CAPTCHA=false
-
-      # Upload screenshots (always — useful for debugging any stage)
-      - name: Upload screenshots
-        if: always()
+          BOOKING_REQUEST_JSON: ${{ inputs.BOOKING_REQUEST_JSON }}
+        run: npm run prepare-booking
+      - name: Run configured booking workflow
+        env:
+          IRCTC_USERNAME: ${{ inputs.USERNAME }}
+          IRCTC_PASSWORD: ${{ inputs.PASSWORD }}
+          BOOKING_REQUEST_JSON: ${{ inputs.BOOKING_REQUEST_JSON }}
+          PLAYWRIGHT_BROWSER: ${{ inputs.BROWSER || 'chromium' }}
+          PLAYWRIGHT_HEADED: 'true'
+        run: xvfb-run -a npm run book
+      - name: Upload failure artifacts
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: cypress-screenshots-${{ github.run_id }}
-          path: cypress/screenshots/
-          retention-days: 7
-          if-no-files-found: ignore
-
-      # Upload videos
-      - name: Upload videos
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-videos-${{ github.run_id }}
-          path: cypress/videos/
-          retention-days: 7
+          name: irctc-failure-${{ github.run_id }}
+          path: artifacts/jobs/
+          retention-days: 3
           if-no-files-found: ignore

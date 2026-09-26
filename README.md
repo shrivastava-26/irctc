@@ -1,6 +1,6 @@
-# IRCTC Cypress automation — evidence-first baseline
+# IRCTC booking automation — Playwright production engine
 
-This repository starts with a deliberately narrow, safe diagnostic flow. It validates the real IRCTC entry state before attempting downstream train search or booking.
+This repository contains a persistent, state-aware Playwright booking engine. Cypress remains temporarily for legacy/regression compatibility.
 
 ## What is implemented
 
@@ -22,13 +22,9 @@ The real IRCTC `/nget/train-search` page rendered in a Chromium browser with:
 
 The language buttons have a malformed, generated accessible name, so the test intentionally matches their rendered `English` text rather than their ARIA name. This has not yet been verified inside Cypress because the local environment prevents Cypress from completing its post-install executable setup.
 
-The entry page also displayed a Tatkal eligibility notice. The project does not treat that notice as permission to proceed with Tatkal booking and will not automate beyond any CAPTCHA, OTP, eligibility, or payment challenge.
+The entry page also displayed a Tatkal eligibility notice. The Beta booking flow is now implemented in the autonomous spec. Downstream selectors are isolated so they can be updated without changing the engine/persistence layers. CAPTCHA/OTP remains a legitimate security challenge rather than an automation-bypass target.
 
-## What is intentionally not implemented yet
-
-Train search, quota selection, passenger data, and payment handoff have no verified current Cypress DOM evidence in this repository. They must be added one state at a time after the entry/authentication test succeeds in a real headed Cypress browser. The suite must stop for CAPTCHA, OTP, or payment authorization.
-
-`MIGRATION.md` explains which safe portions of the original Cypress project are included and why its CAPTCHA and payment automation are intentionally excluded.
+The legacy migration notes and legacy specs remain available for backward compatibility.
 
 ## Run
 
@@ -82,8 +78,7 @@ the UI dev server together):
 npm run start-ui
 ```
 
-None of the flows above include ticket payment automation — every path stops at
-CAPTCHA, OTP, or the payment boundary for a human to complete.
+Legacy flows retain their original guarded behavior. The production engine uses Playwright for browser execution, supports Auto/New/Legacy IRCTC entry selection and detects the actual runtime surface after search. It does not bypass external bank/UPI authorization or security challenges.
 
 ### Troubleshooting
 
@@ -99,10 +94,48 @@ CAPTCHA, OTP, or the payment boundary for a human to complete.
   `IRCTC_RUN_AUTH_FLOW=true` (via `CYPRESS_IRCTC_RUN_AUTH_FLOW=true` or
   `cypress.env.json`) plus `IRCTC_USERNAME`/`IRCTC_PASSWORD` — this is
   intentional; they never run unattended.
-- **CAPTCHA OCR requests fail**: the Python OCR server must be running first
-  (`npm run start-captcha-server`, then wait for `npm run wait-for-captcha-server`
-  or the `/health` endpoint) before any flow that calls `submitCaptcha`/`solveCaptcha`.
-- **Browser gets blocked or times out (WAF)**: always run headed
-  (`--headed --browser chrome`), never headless — this repo intentionally
-  strips the `--headless` flag in `cypress.config.js` because IRCTC's WAF
-  blocks headless/Electron fingerprints.
+- **Legacy CAPTCHA OCR requests fail**: the old legacy specs still depend on the optional OCR service. The autonomous engine does not invoke it.
+- **Browser gets blocked or times out**: record the current state and stop rather than trying to evade the site's security controls. Retry from the persisted state when the access condition is resolved.
+
+
+## Autonomous booking engine
+
+The production booking path is src/engine/playwrightRunner.js. The legacy Cypress autonomous spec remains temporarily for compatibility.
+
+Run preparation:
+
+    npm run prepare-booking
+
+Run the current configured booking request:
+
+    npm run book
+
+Run the scheduler/one-command wrapper:
+
+    npm run auto-book
+
+The autonomous path persists execution checkpoints under .data/automation-runs/<jobId>/state.json, records bounded transition history, and writes timing telemetry.
+
+Configure the request from booking-request.example.json using BOOKING_REQUEST_FILE or BOOKING_REQUEST_JSON. Credentials are supplied through environment variables or the existing server credential reference; do not commit real passwords or payment secrets.
+
+FAST_MODE=true keeps the normal hot path lightweight. DEBUG_MODE=true enables additional diagnostics.
+
+The production workflow treats CAPTCHA/OTP as security challenges rather than attempting to bypass them. A headed browser can remain on the same state while a user completes the challenge, then resume.
+
+Transactional booking and payment states are reconciled before any retry. An unknown outcome is never treated as a safe failure and is never blindly resubmitted.
+
+The existing legacy Cypress specs remain in place for backward compatibility. Production scheduling uses the same persistent Scheduler for immediate and scheduled jobs.
+
+
+### IRCTC entry surfaces
+
+Each journey can use:
+- Auto — try the new entry and fall back to the legacy entry when the new journey form is not available.
+- New — https://www.irctc.co.in/eticket/
+- Legacy — https://www.irctc.co.in/nget/train-search
+
+After search, the engine detects the actual runtime train-list surface. A New entry can legitimately become either the New or Legacy runtime train-list flow.
+
+### Playwright browser targets
+
+The production runner supports chromium, chrome, and edge. Playwright 1.63.0 is pinned in package.json/package-lock; the branded Chrome and Edge channels are supported by Playwright.

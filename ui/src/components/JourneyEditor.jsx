@@ -32,9 +32,14 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
     : {
         source: '',
         destination: '',
+        entrySurface: 'AUTO',
         travelDate: null,
         quota: 'GENERAL',
         trainNumber: '',
+        trainSelectionPolicy: 'FIRST_VALID',
+        preferredTrains: [],
+        backupTrains: [],
+        availabilityRequirement: 'AVAILABLE',
         coach: '3A',
         boardingStation: '',
         passengers: [{
@@ -70,8 +75,17 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
   }
 
   const submitHandler = (data) => {
+    const csv = value => {
+      if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
+      return String(value || '').split(',').map(v => v.trim()).filter(Boolean)
+    }
+
     onSave(Object.assign({}, data, {
       travelDate: data.travelDate ? dayjs(data.travelDate).format('DD/MM/YYYY') : '',
+      entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
+      trainSelectionPolicy: String(data.trainSelectionPolicy || 'FIRST_VALID').toUpperCase(),
+      preferredTrains: csv(data.preferredTrains),
+      backupTrains: csv(data.backupTrains),
       id: initialData && initialData.id ? initialData.id : Date.now().toString(),
     }))
   }
@@ -110,9 +124,35 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
             )} />
           </Grid>
 
+          <Grid item xs={12} sm={6}>
+            <Controller name="entrySurface" control={control} render={({ field }) => (
+              <FormControl fullWidth>
+                <InputLabel>IRCTC Website</InputLabel>
+                <Select {...field} label="IRCTC Website">
+                  <MenuItem value="AUTO">Auto — detect runtime</MenuItem>
+                  <MenuItem value="NEW">New IRCTC — /eticket/</MenuItem>
+                  <MenuItem value="LEGACY">Legacy IRCTC — /nget/train-search</MenuItem>
+                </Select>
+              </FormControl>
+            )} />
+          </Grid>
+
           <Grid item xs={12} sm={3}>
-            <Controller name="trainNumber" control={control} rules={{ required: 'Required' }} render={({ field }) => (
-              <TextField {...field} label="Train No" fullWidth error={!!errors.trainNumber} placeholder="12952" />
+            <Controller name="trainSelectionPolicy" control={control} render={({ field }) => (
+              <FormControl fullWidth>
+                <InputLabel>Train Selection</InputLabel>
+                <Select {...field} label="Train Selection">
+                  <MenuItem value="FIXED">Fixed Train</MenuItem>
+                  <MenuItem value="FIRST_VALID">First Valid</MenuItem>
+                </Select>
+              </FormControl>
+            )} />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Controller name="trainNumber" control={control} rules={{
+              validate: value => watch('trainSelectionPolicy') !== 'FIXED' || String(value || '').trim() ? true : 'Required for Fixed Train',
+            }} render={({ field }) => (
+              <TextField {...field} label="Train No" fullWidth error={!!errors.trainNumber} placeholder="12952 (optional)" />
             )} />
           </Grid>
           <Grid item xs={12} sm={3}>
@@ -133,6 +173,41 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
                   {QUOTAS.map(option => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
                 </Select>
               </FormControl>
+            )} />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Controller name="availabilityRequirement" control={control} render={({ field }) => (
+              <FormControl fullWidth>
+                <InputLabel>Availability</InputLabel>
+                <Select {...field} label="Availability">
+                  <MenuItem value="AVAILABLE">Available</MenuItem>
+                  <MenuItem value="RAC">RAC</MenuItem>
+                  <MenuItem value="WL">Waitlist</MenuItem>
+                  <MenuItem value="ANY">Any</MenuItem>
+                </Select>
+              </FormControl>
+            )} />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Controller name="preferredTrains" control={control} render={({ field }) => (
+              <TextField
+                value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                onChange={field.onChange}
+                label="Preferred Trains"
+                placeholder="12295, 22366"
+                fullWidth
+              />
+            )} />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Controller name="backupTrains" control={control} render={({ field }) => (
+              <TextField
+                value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                onChange={field.onChange}
+                label="Backup Trains"
+                placeholder="Other train numbers"
+                fullWidth
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={3}>

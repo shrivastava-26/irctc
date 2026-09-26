@@ -3,15 +3,16 @@ const path = require('path')
 const { launchSession, closeSession } = require('./irctc/sessionManager')
 const { NewIRCTCAdapter } = require('./irctc/NewIRCTCAdapter')
 const { LegacyIRCTCAdapter } = require('./irctc/LegacyIRCTCAdapter')
-const { SURFACES, normalizeSurface, entryUrl } = require('./irctc/utils')
-const { STATES } = require('./BookingStateMachine')
+const { SURFACES, normalizeSurface, entryUrl, parseTravelDate } = require('./irctc/utils')
 const RunStateStore = require('./RunStateStore')
 const Telemetry = require('./Telemetry')
+const BookingRequest = require('../models/BookingRequest')
 
 const ARTIFACTS_DIR = path.join(__dirname, '..', '..', 'artifacts', 'jobs')
 
 function stateIndex(state) {
-  const index = STATES.indexOf(state)
+  const states = require('./BookingStateMachine').STATES
+  const index = states.indexOf(state)
   return index < 0 ? 0 : index
 }
 
@@ -26,10 +27,15 @@ function atomicWrite(file, value) {
   fs.renameSync(tmp, file)
 }
 
-function emitEvent(onEvent, event) {
-  try {
-    onEvent?.(event)
-  } catch {}
+function writeResult(jobId, result) {
+  atomicWrite(
+    path.join(ARTIFACTS_DIR, jobId, 'result.json'),
+    JSON.stringify(result, null, 2),
+  )
+}
+
+function emit(onEvent, event) {
+  try { onEvent?.(event) } catch {}
 }
 
 function adapterFor(surface, args) {
@@ -38,7 +44,7 @@ function adapterFor(surface, args) {
   throw new Error('Unsupported IRCTC runtime surface: ' + surface)
 }
 
-function makeAdapterArgs(session, request, credentials, jobId, onEvent) {
+function argsFor(session, request, credentials, jobId, onEvent) {
   return {
     page: session.page,
     context: session.context,
@@ -49,220 +55,295 @@ function makeAdapterArgs(session, request, credentials, jobId, onEvent) {
   }
 }
 
+function headless() {
+  if (process.env.PLAYWRIGHT_HEADED == null) return false
+  return String(process.env.PLAYWRIGHT_HEADED).toLowerCase() !== 'true'
+}
+
 async function waitUntil(targetIso, onEvent) {
   if (!targetIso) return
   const target = new Date(targetIso).getTime()
   if (Number.isNaN(target) || target <= Date.now()) return
 
   const remaining = target - Date.now()
-  emitEvent(onEvent, {
+  emit(onEvent, {
     type: 'LOG',
-    message: '[SCHEDULE] Browser/session prepared. Waiting ' + remaining + 'ms for booking execution time.',
+    message: '[SCHEDULE] Preparation complete; waiting for booking time.',
+    metadata: { remainingMs: remaining },
   })
-
   await new Promise(resolve => setTimeout(resolve, remaining))
 }
 
 function preparationWindowMs() {
-  const value = Number(process.env.BOOKING_PREPARATION_WINDOW_MS)
-  return Number.isFinite(value) && value > 0 ? value : 60000
-}
-
-function setState(jobId, state, phase, message, metadata = null) {
-  return RunStateStore.save(jobId, {
-    state,
-    phase,
-    message,
-    metadata,
-  })
+  const configured = Number(process.env.BOOKING_PREPARATION_WINDOW_MS)
+  return Number.isFinite(configured) && configured > 0 ? configured : 60000
 }
 
 async function runBooking(job, credentials, onEvent) {
   const request = job.request
   const startedAt = Date.now()
-  const persistedBefore = RunStateStore.load(job.id)
-  let currentState = persistedBefore?.state || 'BOOT'
+
+  const requestErrors = BookingRequest.validate(request)
+  if (requestErrors.length) {
+    return finalizeFailure(job.id, 'LOAD_CONFIG', requestErrors.join('; '), startedAt, onEvent)
+  }
+
+  const persisted = RunStateStore.load(job.id)
+  let currentState = persisted?.state || 'BOOT'
   let recoveryMode = false
 
-  if (!STATES.includes(currentState)) currentState = 'BOOT'
+  if (persisted?.state === 'SUCCESS') {
+    const result = persisted.metadata?.result
+    return {
+      jobId: job.id,
+      success: Boolean(result?.pnr),
+      exitCode: 0,
+      pnr: result?.pnr || null,
+      state: 'SUCCESS',
+      entrySurface: normalizeSurface(request.entrySurface),
+      runtimeSurface: persisted.metadata?.runtimeSurface || SURFACES.UNKNOWN,
+      selectedTrain: result?.selectedTrain || null,
+      selectedTrainName: result?.selectedTrainName || null,
+      selectedClass: result?.coach || request.coach,
+      selectedQuota: result?.quota || request.quota || 'GENERAL',
+      selectedAvailability: result?.availability || null,
+      elapsedMs: Date.now() - startedAt,
+      telemetry: Telemetry.snapshot(job.id),
+      error: null,
+    }
+  }
 
   if (
-    persistedBefore &&
-    (persistedBefore.state === 'SUBMIT' || persistedBefore.state === 'VERIFY_TRANSACTION') &&
-    persistedBefore.phase === 'RUNNING'
+    persisted &&
+    (persisted.state === 'SUBMIT' || persisted.state === 'VERIFY_TRANSACTION') &&
+    persisted.phase === 'RUNNING'
   ) {
     currentState = 'VERIFY_TRANSACTION'
     recoveryMode = true
   } else if (
-    persistedBefore &&
-    stateIndex(currentState) >= stateIndex('SEARCH') &&
-    stateIndex(currentState) < stateIndex('SUBMIT')
+    persisted &&
+    stateIndex(persisted.state) >= stateIndex('SEARCH') &&
+    stateIndex(persisted.state) < stateIndex('SUBMIT')
   ) {
-    // Browser tabs/pages are not durable state. Rebuild the deterministic,
-    // non-transactional path from journey preparation on process restart.
+    // DOM objects are not durable. Rebuild the safe journey/search path.
     currentState = 'PREPARE_JOURNEY'
     recoveryMode = true
   }
 
-  const headless =
-    process.env.PLAYWRIGHT_HEADED == null
-      ? false
-      : String(process.env.PLAYWRIGHT_HEADED).toLowerCase() !== 'true'
   let session = null
   let adapter = null
   let verification = null
 
-  const step = async (state, nextState, message, action, metadata = null) => {
-    if (!shouldRun(currentState, state)) return
-
-    setState(job.id, state, 'RUNNING', message, metadata)
-    emitEvent(onEvent, { type: 'STATE_CHANGED', state, message, metadata })
-    const mark = Telemetry.mark(job.id, state + '_START', metadata)
-
-    try {
-      const result = await action()
-      setState(job.id, nextState, 'IDLE', message, metadata)
-      emitEvent(onEvent, { type: 'STATE_CHANGED', state: nextState, message, metadata })
-      Telemetry.mark(job.id, nextState + '_READY', {
-        previous: mark.name,
-        ...(metadata || {}),
-      })
-      currentState = nextState
-      return result
-    } catch (error) {
-      setState(job.id, state, 'FAILED', error.message, {
+  const save = (state, phase, message, metadata = null) => {
+    return RunStateStore.save(job.id, {
+      state,
+      phase,
+      message,
+      metadata: {
         ...(metadata || {}),
         recoveryMode,
-      })
+        runtimeSurface: adapter?.runtimeSurface || SURFACES.UNKNOWN,
+      },
+    })
+  }
+
+  const step = async (state, nextState, message, action, metadata = null) => {
+    if (!shouldRun(currentState, state)) return undefined
+
+    save(state, 'RUNNING', message, metadata)
+    emit(onEvent, { type: 'STATE_CHANGED', state, message, metadata })
+    Telemetry.mark(job.id, state + '_START', metadata)
+
+    try {
+      const value = await action()
+      save(nextState, 'IDLE', message, metadata)
+      emit(onEvent, { type: 'STATE_CHANGED', state: nextState, message, metadata })
+      Telemetry.mark(job.id, nextState + '_READY', metadata)
+      currentState = nextState
+      return value
+    } catch (error) {
+      save(state, 'FAILED', error.message, metadata)
       throw error
     }
   }
 
   try {
-    setState(job.id, currentState, 'RUNNING', recoveryMode ? 'Resuming persisted workflow.' : 'Starting Playwright booking workflow.', {
-      recoveryMode,
-    })
+    save(currentState, 'RUNNING', recoveryMode ? 'Resuming persisted booking workflow.' : 'Starting Playwright booking workflow.')
+
+    if (recoveryMode && currentState === 'VERIFY_TRANSACTION') {
+      session = await launchSession({
+        request: { ...request, browser: request.browser || 'edge' },
+        headless: headless(),
+        onEvent,
+      })
+
+      const persistedRuntime = persisted?.metadata?.runtimeSurface
+      const recoverySurface =
+        persistedRuntime === SURFACES.LEGACY
+          ? SURFACES.LEGACY
+          : persistedRuntime === SURFACES.NEW
+            ? SURFACES.NEW
+            : normalizeSurface(request.entrySurface) === SURFACES.LEGACY
+              ? SURFACES.LEGACY
+              : SURFACES.NEW
+
+      adapter = adapterFor(
+        recoverySurface,
+        argsFor(session, request, credentials, job.id, onEvent),
+      )
+
+      const currentUrl = session.page.url()
+      const onKnownBookingPage = /train-list|booking|payment|gateway|transaction/i.test(currentUrl)
+
+      if (!onKnownBookingPage) {
+        await adapter.openEntrySurface()
+      }
+
+      await adapter.ensureEnglish()
+      await adapter.ensureAuthenticated()
+
+      const reconciliation = await adapter.reconcileTransaction()
+      if (reconciliation.status === 'FAILED') {
+        throw new Error('Transaction reconciliation found a failed booking.')
+      }
+      if (reconciliation.status !== 'SUCCESS') {
+        throw new Error('Transaction outcome is unknown after recovery; no duplicate submission was attempted.')
+      }
+
+      verification = await adapter.extractAndVerifyBooking()
+      if (!verification?.pnr) {
+        throw new Error('Transaction reconciliation found a success-looking state without an authoritative PNR.')
+      }
+
+      save('SUCCESS', 'IDLE', 'Recovered and verified authoritative booking result.', verification)
+      currentState = 'SUCCESS'
+      emit(onEvent, {
+        type: 'STATE_CHANGED',
+        state: 'SUCCESS',
+        message: 'Recovered and verified authoritative booking result.',
+        metadata: verification,
+        pnr: verification.pnr,
+      })
+
+      const result = {
+        jobId: job.id,
+        success: true,
+        exitCode: 0,
+        pnr: verification.pnr,
+        state: 'SUCCESS',
+        entrySurface: normalizeSurface(request.entrySurface),
+        runtimeSurface: adapter.runtimeSurface,
+        selectedTrain: verification.selectedTrain,
+        selectedTrainName: verification.selectedTrainName,
+        selectedClass: verification.coach,
+        selectedQuota: verification.quota,
+        selectedAvailability: verification.availability,
+        elapsedMs: Date.now() - startedAt,
+        telemetry: Telemetry.snapshot(job.id),
+        error: null,
+      }
+
+      RunStateStore.save(job.id, {
+        metadata: {
+          result: verification,
+          runtimeSurface: adapter.runtimeSurface,
+          entrySurface: normalizeSurface(request.entrySurface),
+        },
+      })
+      writeResult(job.id, result)
+      return result
+    }
 
     await step(
       'LOAD_CONFIG',
       'RESTORE_SESSION',
-      'Booking request validated.',
+      'Validating booking request.',
       async () => {
-        const BookingRequest = require('../models/BookingRequest')
-        const errors = BookingRequest.validate(request)
-        if (errors.length) throw new Error(errors.join('; '))
-        if (!request.source || !request.destination || !request.travelDate || !request.coach) {
-          throw new Error('source, destination, travelDate and coach are required')
-        }
-      },
-    )
-
-    const requestedEntry = normalizeSurface(request.entrySurface)
-    const entryOrder = requestedEntry === SURFACES.LEGACY
-      ? [SURFACES.LEGACY]
-      : requestedEntry === SURFACES.NEW
-        ? [SURFACES.NEW]
-        : [SURFACES.NEW, SURFACES.LEGACY]
-
-    await step(
-      'RESTORE_SESSION',
-      'VALIDATE_SESSION',
-      'Opening selected IRCTC entry surface.',
-      async () => {
-        let opened = false
-        let lastError = null
-
-        for (const surface of entryOrder) {
-          const candidate = adapterFor(surface, {
-            page: null,
-            context: null,
-            request,
-            credentials,
-            jobId: job.id,
-            emit: onEvent,
-          })
-
-          if (!session) {
-            session = await launchSession({
-              request: {
-                ...request,
-                browser: request.browser || 'edge',
-              },
-              headless,
-              onEvent,
-            })
-          }
-
-          candidate.page = session.page
-          candidate.context = session.context
-
-          try {
-            await candidate.openEntrySurface()
-            adapter = candidate
-            opened = true
-            emitEvent(onEvent, {
-              type: 'LOG',
-              message: '[SURFACE] Entry surface opened: ' + surface + ' (' + entryUrl(surface) + ')',
-            })
-            break
-          } catch (error) {
-            lastError = error
-            if (requestedEntry !== SURFACES.AUTO) throw error
-            emitEvent(onEvent, {
-              type: 'LOG',
-              message: '[SURFACE] New entry failed; AUTO is falling back to Legacy IRCTC: ' + error.message,
-            })
-          }
-        }
-
-        if (!opened) throw lastError || new Error('No IRCTC entry surface could be opened.')
-      },
-    )
-
-    const preSearch = await adapter.detectPreSearchSurface()
-    if (preSearch !== SURFACES.UNKNOWN && preSearch !== adapter.constructor.name.replace('IRCTCAdapter', '').toUpperCase()) {
-      adapter = adapterFor(preSearch, makeAdapterArgs(session, request, credentials, job.id, onEvent))
-    } else {
-      adapter = adapterFor(
-        preSearch === SURFACES.UNKNOWN ? entryOrder[0] : preSearch,
-        makeAdapterArgs(session, request, credentials, job.id, onEvent),
-      )
-    }
-
-    setState(job.id, currentState, 'IDLE', 'Pre-search runtime surface resolved.', {
-      entrySurface: requestedEntry,
-      preSearchSurface: preSearch,
-    })
-
-    await step(
-      'VALIDATE_SESSION',
-      'PRELOAD_MASTER_DATA',
-      'Verifying authenticated IRCTC session.',
-      async () => {
-        await adapter.ensureEnglish()
-        await adapter.ensureAuthenticated()
-      },
-      { entrySurface: requestedEntry, preSearchSurface: preSearch },
-    )
-
-    await step(
-      'PRELOAD_MASTER_DATA',
-      'PREPARE_JOURNEY',
-      'Preparing passenger repository and local configuration.',
-      async () => {
+        parseTravelDate(request.travelDate)
         if (!Array.isArray(request.passengers) || request.passengers.length === 0) {
           throw new Error('At least one passenger is required.')
         }
       },
     )
 
+    const requestedEntry = normalizeSurface(request.entrySurface)
+    const requestedOrder =
+      requestedEntry === SURFACES.LEGACY
+        ? [SURFACES.LEGACY]
+        : requestedEntry === SURFACES.NEW
+          ? [SURFACES.NEW]
+          : [SURFACES.NEW, SURFACES.LEGACY]
+
+    await step(
+      'RESTORE_SESSION',
+      'VALIDATE_SESSION',
+      'Opening selected IRCTC entry surface and restoring persistent browser session.',
+      async () => {
+        session = await launchSession({
+          request: { ...request, browser: request.browser || 'edge' },
+          headless: headless(),
+          onEvent,
+        })
+
+        let lastError = null
+
+        for (const entrySurface of requestedOrder) {
+          const candidate = adapterFor(
+            entrySurface,
+            argsFor(session, request, credentials, job.id, onEvent),
+          )
+
+          try {
+            await candidate.openEntrySurface()
+            const visibleSurface = await candidate.detectPreSearchSurface()
+            if (visibleSurface === SURFACES.UNKNOWN) {
+              throw new Error('Entry page opened but the journey form surface could not be detected.')
+            }
+
+            adapter = visibleSurface === SURFACES.NEW || visibleSurface === SURFACES.LEGACY
+              ? adapterFor(visibleSurface, argsFor(session, request, credentials, job.id, onEvent))
+              : candidate
+
+            emit(onEvent, {
+              type: 'LOG',
+              message: '[SURFACE] Entry=' + requestedEntry +
+                ' opened via ' + entrySurface +
+                ' at ' + entryUrl(entrySurface) +
+                '; pre-search runtime=' + visibleSurface,
+            })
+            return
+          } catch (error) {
+            lastError = error
+            if (requestedEntry !== SURFACES.AUTO) throw error
+          }
+        }
+
+        throw lastError || new Error('No IRCTC entry surface could be opened.')
+      },
+    )
+
+    await step(
+      'VALIDATE_SESSION',
+      'PRELOAD_MASTER_DATA',
+      'Verifying authenticated session.',
+      async () => {
+        await adapter.ensureEnglish()
+        await adapter.ensureAuthenticated()
+      },
+    )
+
+    await step(
+      'PRELOAD_MASTER_DATA',
+      'PREPARE_JOURNEY',
+      'Preparing local passenger configuration.',
+      async () => true,
+    )
+
     await step(
       'PREPARE_JOURNEY',
       'SEARCH',
-      'Filling route, date, class and quota inputs.',
-      async () => {
-        await adapter.prepareJourney()
-      },
+      'Preparing route, requested date, class and quota.',
+      async () => adapter.prepareJourney(),
     )
 
     if (request.executionMode === 'SCHEDULED') {
@@ -273,17 +354,18 @@ async function runBooking(job, credentials, onEvent) {
       'SEARCH',
       'FILTER',
       'Searching trains.',
-      async () => {
-        await adapter.searchJourney()
-      },
+      async () => adapter.searchJourney(),
     )
 
-    let runtimeSurface = await adapter.detectRuntimeSurface()
-    adapter = adapterFor(runtimeSurface, makeAdapterArgs(session, request, credentials, job.id, onEvent))
-
-    setState(job.id, currentState, 'IDLE', 'Runtime surface detected after search.', {
+    const runtimeSurface = adapter.runtimeSurface
+    adapter = adapterFor(
       runtimeSurface,
+      argsFor(session, request, credentials, job.id, onEvent),
+    )
+
+    save(currentState, 'IDLE', 'Runtime surface resolved.', {
       entrySurface: requestedEntry,
+      runtimeSurface,
     })
 
     await step(
@@ -293,9 +375,9 @@ async function runBooking(job, credentials, onEvent) {
       async () => {
         const candidates = await adapter.listCandidates()
         if (!candidates.length) throw new Error('No train candidates were found.')
-        emitEvent(onEvent, {
+        emit(onEvent, {
           type: 'LOG',
-          message: '[FILTER] Found ' + candidates.length + ' train candidate(s) on ' + runtimeSurface + ' runtime surface.',
+          message: '[FILTER] ' + candidates.length + ' train candidate(s) found on ' + runtimeSurface + ' runtime surface.',
         })
       },
       { runtimeSurface },
@@ -304,7 +386,7 @@ async function runBooking(job, credentials, onEvent) {
     let selected = await step(
       'SELECT_TRAIN',
       'VERIFY_AVAILABILITY',
-      'Selecting the first candidate that satisfies train/class/quota/availability requirements.',
+      'Selecting train by configured policy and class-specific availability.',
       async () => adapter.selectTrain(),
       { runtimeSurface },
     )
@@ -314,7 +396,7 @@ async function runBooking(job, credentials, onEvent) {
     await step(
       'VERIFY_AVAILABILITY',
       'LOAD_PASSENGERS',
-      'Rechecking selected train/class availability and opening passenger flow.',
+      'Rechecking the selected train/class and entering the passenger flow.',
       async () => adapter.verifyAvailability(),
       {
         runtimeSurface,
@@ -325,21 +407,24 @@ async function runBooking(job, credentials, onEvent) {
     await step(
       'LOAD_PASSENGERS',
       'FILL_PASSENGERS',
-      'Loading Master Passenger data and passenger fields.',
-      async () => adapter.selectPassengers(),
+      'Preparing passenger entry.',
+      async () => true,
     )
 
     await step(
       'FILL_PASSENGERS',
       'VALIDATE_BOOKING',
-      'Passenger information populated and verified.',
+      'Selecting Master Passenger data and filling scoped passenger fields.',
       async () => adapter.selectPassengers(),
+      {
+        passengerCount: request.passengers.length,
+      },
     )
 
     await step(
       'VALIDATE_BOOKING',
       'SUBMIT',
-      'Running strict pre-submission validation.',
+      'Running strict pre-submission verification.',
       async () => adapter.validateReview(),
     )
 
@@ -353,14 +438,11 @@ async function runBooking(job, credentials, onEvent) {
     }
 
     if (currentState === 'VERIFY_TRANSACTION') {
-      if (recoveryMode && persistedBefore?.state === 'VERIFY_TRANSACTION') {
-        const reconciliation = await adapter.reconcileTransaction?.() || { status: 'UNKNOWN' }
+      if (recoveryMode) {
+        const reconciliation = await adapter.reconcileTransaction()
         if (reconciliation.status === 'SUCCESS') {
-          emitEvent(onEvent, {
-            type: 'LOG',
-            message: '[RECONCILE] Existing booking result found; no transaction was resubmitted.',
-            metadata: reconciliation,
-          })
+          verification = await adapter.extractAndVerifyBooking()
+          if (!verification?.pnr) throw new Error('Transaction reconciliation found success without a verified PNR.')
         } else if (reconciliation.status === 'FAILED') {
           throw new Error('Transaction reconciliation found a failed booking.')
         } else {
@@ -369,131 +451,137 @@ async function runBooking(job, credentials, onEvent) {
       } else {
         await adapter.verifyTransaction()
       }
-
-      setState(job.id, 'VERIFY_BOOKING', 'IDLE', 'Transaction outcome reconciled.', {
-        runtimeSurface: adapter.runtimeSurface,
-      })
-      currentState = 'VERIFY_BOOKING'
-      emitEvent(onEvent, {
-        type: 'STATE_CHANGED',
-        state: 'VERIFY_BOOKING',
-        message: 'Transaction outcome reconciled.',
-      })
     }
 
-    if (shouldRun(currentState, 'VERIFY_BOOKING')) {
-      setState(job.id, 'VERIFY_BOOKING', 'RUNNING', 'Verifying authoritative booking result.')
+    if (!verification && shouldRun(currentState, 'VERIFY_BOOKING')) {
+      save('VERIFY_BOOKING', 'RUNNING', 'Verifying authoritative booking result.')
       verification = await adapter.extractAndVerifyBooking()
-
-      if (!verification?.pnr) {
-        throw new Error('Booking cannot be marked successful without an authoritative PNR.')
-      }
-
-      setState(job.id, 'SUCCESS', 'IDLE', 'Booking result verified.', verification)
-      currentState = 'SUCCESS'
-      emitEvent(onEvent, {
-        type: 'STATE_CHANGED',
-        state: 'SUCCESS',
-        message: 'Booking result verified.',
-        metadata: verification,
-        pnr: verification.pnr,
-      })
     }
 
-    const telemetry = Telemetry.snapshot(job.id)
+    if (!verification?.pnr) {
+      throw new Error('Booking cannot be marked successful without an authoritative PNR.')
+    }
+
+    save('SUCCESS', 'IDLE', 'Booking result verified.', verification)
+    currentState = 'SUCCESS'
+    emit(onEvent, {
+      type: 'STATE_CHANGED',
+      state: 'SUCCESS',
+      message: 'Booking result verified.',
+      metadata: verification,
+      pnr: verification.pnr,
+    })
+
     const result = {
       jobId: job.id,
-      success: currentState === 'SUCCESS' && Boolean(verification?.pnr),
+      success: true,
       exitCode: 0,
-      pnr: verification?.pnr || null,
-      state: currentState,
+      pnr: verification.pnr,
+      state: 'SUCCESS',
       entrySurface: requestedEntry,
-      runtimeSurface: adapter.runtimeSurface,
-      selectedTrain: verification?.selectedTrain || adapter.selected?.trainNumber || null,
-      selectedTrainName: verification?.selectedTrainName || adapter.selected?.trainName || null,
-      selectedClass: verification?.coach || adapter.selected?.class || request.coach,
-      selectedQuota: verification?.quota || adapter.selected?.quota || request.quota || 'GENERAL',
-      selectedAvailability: verification?.availability || adapter.selected?.availability || null,
+      runtimeSurface,
+      selectedTrain: verification.selectedTrain,
+      selectedTrainName: verification.selectedTrainName,
+      selectedClass: verification.coach,
+      selectedQuota: verification.quota,
+      selectedAvailability: verification.availability,
       elapsedMs: Date.now() - startedAt,
-      telemetry,
+      telemetry: Telemetry.snapshot(job.id),
       error: null,
     }
+
+    // Preserve the authoritative result for recovery/reconciliation.
+    RunStateStore.save(job.id, {
+      metadata: {
+        result: verification,
+        runtimeSurface,
+        entrySurface: requestedEntry,
+      },
+    })
 
     writeResult(job.id, result)
     return result
   } catch (error) {
-    const finalState = RunStateStore.load(job.id)?.state || currentState
-    setState(job.id, finalState, 'FAILED', error.message, {
-      recoveryMode,
-      entrySurface: normalizeSurface(request.entrySurface),
-      runtimeSurface: adapter?.runtimeSurface || SURFACES.UNKNOWN,
-      elapsedMs: Date.now() - startedAt,
-    })
-
-    const failureDir = path.join(ARTIFACTS_DIR, job.id)
-    fs.mkdirSync(failureDir, { recursive: true })
-
-    try {
-      if (session?.page) await session.page.screenshot({ path: path.join(failureDir, 'failure.png'), fullPage: true })
-    } catch {}
-
-    const result = {
-      jobId: job.id,
-      success: false,
-      exitCode: -1,
-      pnr: null,
-      state: finalState,
-      entrySurface: normalizeSurface(request.entrySurface),
-      runtimeSurface: adapter?.runtimeSurface || SURFACES.UNKNOWN,
-      elapsedMs: Date.now() - startedAt,
-      telemetry: Telemetry.snapshot(job.id),
-      error: error.message,
-    }
-    writeResult(job.id, result)
-    return result
+    return finalizeFailure(
+      job.id,
+      RunStateStore.load(job.id)?.state || currentState,
+      error.message,
+      startedAt,
+      onEvent,
+      {
+        entrySurface: normalizeSurface(request.entrySurface),
+        runtimeSurface: adapter?.runtimeSurface || SURFACES.UNKNOWN,
+        recoveryMode,
+      },
+      session,
+    )
   } finally {
     if (session) {
-      try {
-        const trace = Boolean(request.debugMode)
-        if (trace) {
-          const tracePath = path.join(ARTIFACTS_DIR, job.id, 'playwright-trace.zip')
-          fs.mkdirSync(path.dirname(tracePath), { recursive: true })
-          await session.context.tracing.stop({ path: tracePath }).catch(() => {})
-        }
-      } finally {
-        await closeSession(session)
+      if (request.debugMode) {
+        const tracePath = path.join(ARTIFACTS_DIR, job.id, 'playwright-trace.zip')
+        fs.mkdirSync(path.dirname(tracePath), { recursive: true })
+        await session.context.tracing.stop({ path: tracePath }).catch(() => {})
       }
+      await closeSession(session)
     }
   }
 }
 
-function writeResult(jobId, result) {
-  const file = path.join(ARTIFACTS_DIR, jobId, 'result.json')
-  atomicWrite(file, JSON.stringify(result, null, 2))
+async function finalizeFailure(jobId, state, error, startedAt, onEvent, metadata = {}, session = null) {
+  RunStateStore.save(jobId, {
+    state,
+    phase: 'FAILED',
+    message: error,
+    metadata: { ...metadata, runtimeSurface: metadata.runtimeSurface || SURFACES.UNKNOWN },
+  })
+
+  const dir = path.join(ARTIFACTS_DIR, jobId)
+  fs.mkdirSync(dir, { recursive: true })
+
+  if (session?.page) {
+    await session.page.screenshot({
+      path: path.join(dir, 'failure.png'),
+      fullPage: true,
+    }).catch(() => {})
+  }
+
+  const result = {
+    jobId,
+    success: false,
+    exitCode: -1,
+    pnr: null,
+    state,
+    entrySurface: metadata.entrySurface || SURFACES.UNKNOWN,
+    runtimeSurface: metadata.runtimeSurface || SURFACES.UNKNOWN,
+    elapsedMs: Date.now() - startedAt,
+    telemetry: Telemetry.snapshot(jobId),
+    error,
+  }
+
+  writeResult(jobId, result)
+  emit(onEvent, { type: 'LOG', state, message: '[FAILED] ' + error })
+  return result
 }
 
 async function runMock(job, onEvent) {
-  const states = [
-    ['LOAD_CONFIG', 'Mock: configuration validated.'],
-    ['SEARCH', 'Mock: searching trains.'],
-    ['SELECT_TRAIN', 'Mock: train selected.'],
-    ['VERIFY_AVAILABILITY', 'Mock: availability verified.'],
-    ['FILL_PASSENGERS', 'Mock: passenger data verified.'],
-    ['VERIFY_BOOKING', 'Mock: booking result verified.'],
-    ['SUCCESS', 'Mock: booking confirmed.'],
-  ]
-
-  for (const [state, message] of states) {
-    emitEvent(onEvent, { type: 'STATE_CHANGED', state, message })
+  const verification = {
+    pnr: '0000000000',
+    selectedTrain: '00000',
+    selectedTrainName: 'MOCK',
+    coach: job.request.coach,
+    quota: job.request.quota || 'GENERAL',
+    availability: { status: 'AVAILABLE', raw: 'MOCK AVAILABLE' },
+    verifiedAt: new Date().toISOString(),
   }
 
+  emit(onEvent, { type: 'STATE_CHANGED', state: 'SUCCESS', message: 'Mock booking result verified.', pnr: verification.pnr })
   return {
     success: true,
-    pnr: '0000000000',
+    pnr: verification.pnr,
     state: 'SUCCESS',
-    selectedTrain: '00000',
-    selectedClass: job.request.coach,
-    selectedQuota: job.request.quota || 'GENERAL',
+    selectedTrain: verification.selectedTrain,
+    selectedClass: verification.coach,
+    selectedQuota: verification.quota,
     error: null,
   }
 }

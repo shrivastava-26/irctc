@@ -10,17 +10,22 @@ import AddIcon from '@mui/icons-material/Add'
 const API = '/api'
 
 const STAGES = [
-  'JOB_CREATED',
-  'LOGIN',
+  'LOAD_CONFIG',
+  'RESTORE_SESSION',
+  'VALIDATE_SESSION',
+  'PRELOAD_MASTER_DATA',
+  'PREPARE_JOURNEY',
   'SEARCH',
-  'TRAIN_FOUND',
-  'TRAIN_SELECTION',
-  'COACH_SELECTION',
-  'AVAILABILITY',
-  'BOOKING_FORM',
-  'REVIEW',
-  'PAYMENT',
-  'BOOKING_CONFIRMED',
+  'FILTER',
+  'SELECT_TRAIN',
+  'VERIFY_AVAILABILITY',
+  'LOAD_PASSENGERS',
+  'FILL_PASSENGERS',
+  'VALIDATE_BOOKING',
+  'SUBMIT',
+  'VERIFY_TRANSACTION',
+  'VERIFY_BOOKING',
+  'SUCCESS',
 ]
 
 export default function AutomationDialog({ open, activeJobs, onClose, onAddJourney }) {
@@ -126,7 +131,7 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
               Journey {activeIndex + 1} / {jobsData.length}
             </Typography>
             <Typography variant="body1" fontWeight="bold" sx={{ overflowWrap: 'anywhere' }}>
-              {activeJob.request?.source} → {activeJob.request?.destination} · {activeJob.request?.trainNumber}
+              {activeJob.request?.source} → {activeJob.request?.destination} · {activeJob.request?.trainNumber || 'AUTO-SELECT'}
             </Typography>
           </Box>
         )}

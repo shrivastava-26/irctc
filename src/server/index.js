@@ -32,6 +32,8 @@ function toPublicJob(job) {
       destination: req.destination,
       travelDate: req.travelDate,
       quota: req.quota,
+      entrySurface: req.entrySurface || 'AUTO',
+      trainSelectionPolicy: req.trainSelectionPolicy || 'FIRST_VALID',
       trainNumber: req.trainNumber,
       coach: req.coach,
       boardingStation: req.boardingStation || null,
@@ -39,6 +41,7 @@ function toPublicJob(job) {
       scheduledAt: req.scheduledAt || null,
       isMock: Boolean(req.isMock),
       browser: req.browser || null,
+      availabilityRequirement: req.availabilityRequirement || 'AVAILABLE',
       passengerCount: Array.isArray(req.passengers) ? req.passengers.length : 0,
       paymentMethod: req.paymentPreference && req.paymentPreference.method
         ? req.paymentPreference.method
@@ -135,8 +138,15 @@ app.post('/credentials', async (req, res) => {
 })
 
 if (require.main === module || process.env.RUN_JOB_MANAGER !== 'false') {
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('[Job Manager] Listening on http://0.0.0.0:' + PORT)
+    Scheduler.recoverPendingJobs().catch((error) => {
+      console.error('[Job Manager] Failed to recover pending jobs:', error.message)
+    })
+  })
+
+  server.on('error', (error) => {
+    console.error('[Job Manager] Server error:', error.message)
   })
 }
 

@@ -130,8 +130,13 @@ export default function App() {
         source: String(journey.source || '').toUpperCase(),
         destination: String(journey.destination || '').toUpperCase(),
         travelDate: journey.travelDate || '',
+        entrySurface: journey.entrySurface || 'AUTO',
         quota: journey.quota,
-        trainNumber: journey.trainNumber,
+        trainNumber: journey.trainNumber || undefined,
+        preferredTrains: Array.isArray(journey.preferredTrains) ? journey.preferredTrains : [],
+        backupTrains: Array.isArray(journey.backupTrains) ? journey.backupTrains : [],
+        trainSelectionPolicy: journey.trainSelectionPolicy || 'FIRST_VALID',
+        availabilityRequirement: journey.availabilityRequirement || 'AVAILABLE',
         coach: String(journey.coach || '').toUpperCase(),
         boardingStation: journey.boardingStation
           ? String(journey.boardingStation).toUpperCase()
@@ -144,7 +149,9 @@ export default function App() {
         executionMode: journey.executionMode,
         scheduledAt: journey.executionMode === 'SCHEDULED' ? journey.scheduledAt : undefined,
         isMock: journey.isMock,
-        browser: 'edge',
+        browser: journey.browser || 'edge',
+        fastMode: journey.fastMode !== false,
+        debugMode: Boolean(journey.debugMode),
       }
 
       try {

@@ -80,3 +80,6 @@ old_commands.js
 repair.js
 update_mock_btn.py
 update_mock_js.py
+# Autonomous runtime and personal booking request
+.data/
+booking-request.json

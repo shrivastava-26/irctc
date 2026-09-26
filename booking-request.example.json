@@ -1,0 +1,30 @@
+{
+  "credentialsReference": "YOUR_IRCTC_USERNAME",
+  "entrySurface": "AUTO",
+  "source": "SMVT",
+  "destination": "PNBE",
+  "travelDate": "26/11/2026",
+  "quota": "GENERAL",
+  "coach": "SL",
+  "preferredTrains": [],
+  "backupTrains": [],
+  "availabilityRequirement": "AVAILABLE",
+  "passengers": [
+    {
+      "name": "Prince Raj",
+      "age": 24,
+      "gender": "Male",
+      "berth": "No Preference",
+      "food": "No Food"
+    }
+  ],
+  "paymentPreference": {
+    "method": "UPI",
+    "upiId": "YOUR_UPI_ID"
+  },
+  "executionMode": "NOW",
+  "fastMode": true,
+  "debugMode": false,
+  "browser": "edge",
+  "trainSelectionPolicy": "FIRST_VALID"
+}
