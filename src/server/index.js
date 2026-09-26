@@ -8,6 +8,7 @@ const { Job } = require('../models/Job')
 const { validate, normalize } = require('../models/BookingRequest')
 const JobStore = require('../persistence/JobStore')
 const Scheduler = require('../scheduler/Scheduler')
+const { authorizeWorker, configuredToken } = require('../security/WorkerAuth')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -40,6 +41,7 @@ function toPublicJob(job) {
       travelDate: req.travelDate,
       quota: req.quota,
       entrySurface: req.entrySurface || 'AUTO',
+      executionTarget: req.executionTarget || 'HOSTED',
       trainSelectionPolicy: req.trainSelectionPolicy || 'FIRST_VALID',
       trainNumber: req.trainNumber,
       coach: req.coach,
@@ -59,6 +61,13 @@ function toPublicJob(job) {
     errorInformation: job.errorInformation,
     completedAt: job.completedAt,
   }
+}
+
+function workerAuth(req, res) {
+  const auth = authorizeWorker(req)
+  if (auth.ok) return true
+  res.status(auth.status).json({ error: auth.error })
+  return false
 }
 
 app.post('/jobs', (req, res) => {
@@ -117,6 +126,88 @@ app.post('/jobs/:id/events', (req, res) => {
   res.status(201).json({ ok: true })
 })
 
+// Local execution worker API.
+// Credentials are never accepted by these endpoints; the worker resolves them locally.
+app.post('/worker/claim', (req, res) => {
+  if (!workerAuth(req, res)) return
+
+  const { workerId, executionTarget = 'LOCAL', accountReference = null, leaseMs } = req.body || {}
+  if (!workerId) return res.status(400).json({ error: 'workerId is required' })
+  if (String(executionTarget).toUpperCase() !== 'LOCAL') {
+    return res.status(400).json({ error: 'executionTarget must be LOCAL' })
+  }
+
+  try {
+    const job = JobStore.claimNextAvailable({
+      executionTarget: 'LOCAL',
+      workerId: String(workerId),
+      accountReference: accountReference ? String(accountReference) : null,
+      leaseMs,
+      preparationWindowMs: Number(process.env.BOOKING_PREPARATION_WINDOW_MS) || 60000,
+    })
+
+    if (!job) return res.status(204).end()
+    return res.json({ job })
+  } catch (error) {
+    console.error('[WORKER] Claim error:', error.message)
+    return res.status(500).json({ error: error.message })
+  }
+})
+
+app.post('/worker/jobs/:id/heartbeat', (req, res) => {
+  if (!workerAuth(req, res)) return
+
+  const { workerId, leaseMs } = req.body || {}
+  if (!workerId) return res.status(400).json({ error: 'workerId is required' })
+
+  const result = JobStore.heartbeat(req.params.id, String(workerId), leaseMs)
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+
+  res.json({ job: result.job })
+})
+
+app.post('/worker/jobs/:id/events', (req, res) => {
+  if (!workerAuth(req, res)) return
+
+  const { workerId, event, leaseMs } = req.body || {}
+  if (!workerId) return res.status(400).json({ error: 'workerId is required' })
+
+  const result = JobStore.appendWorkerEvent(
+    req.params.id,
+    String(workerId),
+    event,
+    leaseMs,
+  )
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+
+  res.status(201).json({ job: result.job })
+})
+
+app.post('/worker/jobs/:id/complete', (req, res) => {
+  if (!workerAuth(req, res)) return
+
+  const { workerId, success, result, error } = req.body || {}
+  if (!workerId) return res.status(400).json({ error: 'workerId is required' })
+
+  const completed = JobStore.completeFromWorker(
+    req.params.id,
+    String(workerId),
+    Boolean(success),
+    result || null,
+    error || null,
+  )
+  if (!completed.ok) return res.status(completed.status).json({ error: completed.error })
+
+  res.json({ job: completed.job })
+})
+
+app.get('/worker/status', (req, res) => {
+  res.json({
+    configured: Boolean(configuredToken()),
+    timestamp: new Date().toISOString(),
+  })
+})
+
 // Serve the production Vite build from the same origin as the API.
 // This is required for the Render web service, which runs only the Node server.
 const uiDistPath = path.join(__dirname, '../../ui/dist')
@@ -151,7 +242,7 @@ app.post('/credentials', async (req, res) => {
 // Static UI and SPA fallback must come after API routes.
 app.use(express.static(uiDistPath))
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/jobs') || req.path.startsWith('/credentials')) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/jobs') || req.path.startsWith('/credentials') || req.path.startsWith('/worker')) {
     return next()
   }
   res.sendFile(path.join(uiDistPath, 'index.html'))

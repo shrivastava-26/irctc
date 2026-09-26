@@ -1,5 +1,5 @@
-// Executes persisted jobs immediately or from a persistent scheduled state.
-// The scheduler owns timing; the browser runner owns browser execution.
+// Executes persisted hosted jobs. Local-target jobs are owned by the
+// outbound-polling local browser worker and are never launched on Render.
 
 const CredentialManager = require('../security/CredentialManager')
 const { runBooking, runMock } = require('../engine/playwrightRunner')
@@ -33,6 +33,12 @@ function sleep(ms) {
 }
 
 async function schedule(job) {
+  if (String(job.request?.executionTarget || '').toUpperCase() === 'LOCAL') {
+    job.addLog('[SCHEDULER] Local execution selected; waiting for the outbound local browser worker.')
+    JobStore.save(job)
+    return
+  }
+
   const delayMs = executionStartDelayMs(job.scheduledAt)
 
   if (delayMs > 0) {
@@ -52,7 +58,7 @@ async function execute(job) {
   if (activeJobs.has(job.id)) return
 
   const persisted = JobStore.findById(job.id)
-  if (persisted?.status === 'COMPLETED') return
+  if (persisted?.status === 'COMPLETED' || persisted?.request?.executionTarget === 'LOCAL') return
 
   activeJobs.add(job.id)
   let releaseWorker = null
@@ -72,13 +78,8 @@ async function execute(job) {
       if (result.success && result.pnr) job.complete(result.pnr, result)
       else job.fail(result.error || 'Mock execution did not verify a result.')
     } else {
-      const credentials = await CredentialManager.getCredentials(
-        job.request.credentialsReference,
-      )
-
-      result = await runBooking(job, credentials, event =>
-        onEngineEvent(job, event),
-      )
+      const credentials = await CredentialManager.getCredentials(job.request.credentialsReference)
+      result = await runBooking(job, credentials, event => onEngineEvent(job, event))
 
       if (result.success && result.pnr && result.state === 'SUCCESS') {
         job.complete(result.pnr, result)
@@ -111,7 +112,8 @@ async function recoverPendingJobs() {
   recovered = true
 
   const pending = JobStore.findAll()
-    .filter(data => data.status === 'STARTING' || data.status === 'RUNNING')
+    .filter(data => (data.status === 'STARTING' || data.status === 'RUNNING'))
+    .filter(data => String(data.request?.executionTarget || 'HOSTED').toUpperCase() !== 'LOCAL')
     .map(data => Job.fromJSON(data))
 
   for (const job of pending) {

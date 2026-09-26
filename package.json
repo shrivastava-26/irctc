@@ -20,7 +20,9 @@
     "test:unit": "node --test tests/unit/*.test.js",
     "prepare-booking": "node scripts/prepare.js",
     "playwright:install": "npx playwright install --with-deps chromium",
-    "smoke:playwright": "node tests/browser/playwright.smoke.js"
+    "smoke:playwright": "node tests/browser/playwright.smoke.js",
+    "start:local-worker": "node scripts/local-worker.js",
+    "test:local-worker": "node --test tests/unit/localWorker.test.js tests/unit/workerQueue.test.js"
   },
   "author": "Prince Shrivastava",
   "license": "ISC",

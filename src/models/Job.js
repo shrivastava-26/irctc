@@ -21,6 +21,10 @@ class Job {
     this.progressEvents = []
     this.errorInformation = null
     this.completedAt = null
+    this.claimedBy = null
+    this.claimedAt = null
+    this.leaseExpiresAt = null
+    this.lastHeartbeatAt = null
 
     this._addEvent({
       type: 'STATUS_CHANGED',
@@ -40,6 +44,10 @@ class Job {
     job.progressEvents = Array.isArray(data.progressEvents) ? data.progressEvents : []
     job.errorInformation = data.errorInformation || null
     job.completedAt = data.completedAt || null
+    job.claimedBy = data.claimedBy || null
+    job.claimedAt = data.claimedAt || null
+    job.leaseExpiresAt = data.leaseExpiresAt || null
+    job.lastHeartbeatAt = data.lastHeartbeatAt || null
     return job
   }
 
@@ -56,6 +64,7 @@ class Job {
     this.status = JOB_STATUS.COMPLETED
     this.completedAt = new Date().toISOString()
     this.currentState = 'SUCCESS'
+    this.clearLease()
     this._addEvent({
       type: 'STATUS_CHANGED',
       state: 'SUCCESS',
@@ -69,6 +78,7 @@ class Job {
     this.status = JOB_STATUS.FAILED
     this.errorInformation = reason || 'Unknown error'
     this.completedAt = new Date().toISOString()
+    this.clearLease()
     this._addEvent({
       type: 'STATUS_CHANGED',
       state: this.currentState,
@@ -79,6 +89,34 @@ class Job {
 
   markRunning() {
     this.status = JOB_STATUS.RUNNING
+  }
+
+  claim(workerId, leaseMs) {
+    const now = Date.now()
+    this.claimedBy = workerId
+    this.claimedAt = new Date(now).toISOString()
+    this.lastHeartbeatAt = new Date(now).toISOString()
+    this.leaseExpiresAt = new Date(now + leaseMs).toISOString()
+    this.markRunning()
+    this._addEvent({
+      type: 'WORKER_CLAIMED',
+      state: this.currentState,
+      workerId,
+      leaseExpiresAt: this.leaseExpiresAt,
+    })
+  }
+
+  heartbeat(leaseMs) {
+    const now = Date.now()
+    this.lastHeartbeatAt = new Date(now).toISOString()
+    this.leaseExpiresAt = new Date(now + leaseMs).toISOString()
+  }
+
+  clearLease() {
+    this.claimedBy = null
+    this.claimedAt = null
+    this.leaseExpiresAt = null
+    this.lastHeartbeatAt = null
   }
 
   _addEvent(fields) {
@@ -99,6 +137,10 @@ class Job {
       progressEvents: this.progressEvents,
       errorInformation: this.errorInformation,
       completedAt: this.completedAt,
+      claimedBy: this.claimedBy,
+      claimedAt: this.claimedAt,
+      leaseExpiresAt: this.leaseExpiresAt,
+      lastHeartbeatAt: this.lastHeartbeatAt,
     }
   }
 }

@@ -104,36 +104,15 @@ export default function App() {
       return
     }
 
-    try {
-      const credentialResponse = await fetch(API + '/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountName: account.username.trim(),
-          password: account.password,
-        }),
-      })
-
-      let credentialData = {}
-      try {
-        credentialData = await credentialResponse.json()
-      } catch {
-      }
-
-      if (!credentialResponse.ok) {
-        throw new Error(credentialData.error || 'Failed to register credentials')
-      }
-    } catch (err) {
-      toast.error('Credential Error: ' + err.message)
-      return
-    }
-
+    // LOCAL execution keeps the account secret on the browser/local machine.
+    // The worker resolves credentials from its own environment or credential file.
     const newJobIds = []
     let started = 0
 
     for (const journey of journeysToAutomate) {
       const payload = {
         credentialsReference: account.username,
+        executionTarget: 'LOCAL',
         source: String(journey.source || '').toUpperCase(),
         destination: String(journey.destination || '').toUpperCase(),
         travelDate: journey.travelDate || '',
@@ -156,7 +135,7 @@ export default function App() {
         executionMode: journey.executionMode,
         scheduledAt: journey.executionMode === 'SCHEDULED' ? journey.scheduledAt : undefined,
         isMock: journey.isMock,
-        browser: journey.browser || 'edge',
+        browser: journey.browser || 'chromium',
         fastMode: journey.fastMode !== false,
         debugMode: Boolean(journey.debugMode),
       }
