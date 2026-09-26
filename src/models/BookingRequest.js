@@ -5,6 +5,7 @@ const VALID_EXECUTION_MODES = ['NOW', 'SCHEDULED']
 const VALID_PAYMENT_METHODS = ['UPI']
 const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
+const VALID_TRAIN_SELECTION = ['FIXED', 'FIRST_VALID']
 
 function validate(data) {
   const errors = []
@@ -25,9 +26,14 @@ function validate(data) {
     data.trainNumber ||
     (Array.isArray(data.preferredTrains) && data.preferredTrains.length > 0) ||
     (Array.isArray(data.backupTrains) && data.backupTrains.length > 0)
+  const selectionPolicy = data.trainSelectionPolicy || 'FIRST_VALID'
 
-  if (!hasTrainSelection) {
-    errors.push('trainNumber or preferredTrains/backupTrains is required')
+  if (!VALID_TRAIN_SELECTION.includes(selectionPolicy)) {
+    errors.push('trainSelectionPolicy must be one of: ' + VALID_TRAIN_SELECTION.join(', '))
+  }
+
+  if (!hasTrainSelection && selectionPolicy === 'FIXED') {
+    errors.push('trainNumber or preferredTrains/backupTrains is required when trainSelectionPolicy is FIXED')
   }
 
   if (data.quota && !VALID_QUOTAS.includes(data.quota)) {
@@ -106,6 +112,7 @@ function normalize(data) {
     backupTrains: Array.isArray(data.backupTrains)
       ? data.backupTrains.map(String)
       : [],
+    trainSelectionPolicy: data.trainSelectionPolicy || 'FIRST_VALID',
     coach: String(data.coach).toUpperCase(),
     boardingStation: data.boardingStation
       ? String(data.boardingStation).toUpperCase()
