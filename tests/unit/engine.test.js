@@ -50,3 +50,25 @@ test('booking request supports first-valid train selection', () => {
   assert.equal(normalized.trainSelectionPolicy, 'FIRST_VALID')
   assert.equal(normalized.trainNumber, null)
 })
+
+
+test('booking request supports both IRCTC entry surfaces', () => {
+  const base = {
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    travelDate: '26/11/2026',
+    coach: 'SL',
+    quota: 'GENERAL',
+    passengers: [{ name: 'Prince Raj', age: 24, gender: 'Male' }],
+    trainSelectionPolicy: 'FIRST_VALID',
+  }
+
+  assert.deepEqual(validate({ ...base, entrySurface: 'NEW' }), [])
+  assert.deepEqual(validate({ ...base, entrySurface: 'LEGACY' }), [])
+  assert.equal(normalize({ ...base, entrySurface: 'LEGACY' }).entrySurface, 'LEGACY')
+  assert.throws(
+    () => validate({ ...base, entrySurface: 'OTHER' }),
+    /entrySurface must be NEW or LEGACY/,
+  )
+})
