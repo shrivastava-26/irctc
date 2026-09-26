@@ -278,11 +278,27 @@ app.post('/credentials', async (req, res) => {
 })
 
 // Static UI and SPA fallback must come after API routes.
-app.use(express.static(uiDistPath))
+// HTML is intentionally never cached so an already-open mobile browser cannot
+// keep an old Vite entrypoint after a Render deployment. Hashed Vite assets can
+// remain immutable because their filenames change whenever their contents do.
+app.use(express.static(uiDistPath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    }
+  },
+}))
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/jobs') || req.path.startsWith('/credentials') || req.path.startsWith('/worker')) {
     return next()
   }
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
   res.sendFile(path.join(uiDistPath, 'index.html'))
 })
 
