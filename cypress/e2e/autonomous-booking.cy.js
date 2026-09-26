@@ -156,6 +156,88 @@ function availabilityStatus(value) {
   return 'UNKNOWN'
 }
 
+
+const ENTRY_SURFACES = {
+  LEGACY: /\/nget\//i,
+  NEW: /\/eticket\//i,
+}
+
+function entrySurface() {
+  const configured = String(Cypress.env('IRCTC_ENTRY_URL') || BETA_URL)
+  return ENTRY_SURFACES.LEGACY.test(configured) ? 'LEGACY' : 'NEW'
+}
+
+function selectLegacyStation(inputSelector, value, patterns) {
+  cy.get(inputSelector, {timeout:15000}).filter(':visible').first().click().clear().type(String(value).slice(0, 6))
+  visibleInputsMatching(patterns).last().should('be.visible')
+  cy.get('.ui-autocomplete-panel li:visible, .p-autocomplete-panel li:visible, [role="option"]:visible', {timeout:15000}).first().click()
+}
+
+function prepareJourneyForSurface(request) {
+  const surface = entrySurface()
+  cy.task('log', '[SURFACE] ' + surface + ' ' + String(Cypress.env('IRCTC_ENTRY_URL') || BETA_URL))
+
+  if (surface === 'LEGACY') {
+    selectLegacyStation(
+      'input[formcontrolname="origin"], input[placeholder*="From" i], input[aria-label*="From" i]',
+      request.source,
+      [/from/i, /source/i, /origin/i],
+    )
+    selectLegacyStation(
+      'input[formcontrolname="destination"], input[placeholder*="To" i], input[aria-label*="To" i]',
+      request.destination,
+      [/to/i, /destination/i],
+    )
+
+    cy.get('input[formcontrolname*="journey" i], input[placeholder*="DD/MM/YYYY" i], input[aria-label*="date" i]', {timeout:15000})
+      .filter(':visible').first().click()
+
+    const [day] = String(request.travelDate).split('/')
+    cy.get('body').then(($body) => {
+      const matches = $body.find('td a:visible, td button:visible, .ui-datepicker-calendar a:visible')
+        .filter((_, el) => String(Cypress.$(el).text()).trim() === String(Number(day)))
+      if (!matches.length) throw new Error('Legacy IRCTC date picker did not expose requested day ' + day)
+      return cy.wrap(matches.first()).click()
+    })
+
+    const quota = String(request.quota || 'GENERAL').toUpperCase()
+    cy.get('[formcontrolname*="quota" i], p-dropdown[placeholder*="Quota" i], [aria-label*="Quota" i]', {timeout:10000})
+      .filter(':visible').first().click()
+    cy.contains('.ui-dropdown-item, .p-dropdown-item, [role="option"], li', quota === 'GENERAL' ? /GENERAL/i : new RegExp(quota, 'i'), {timeout:10000})
+      .filter(':visible').first().click()
+    return
+  }
+
+  selectNewStation('From', request.source)
+  selectNewStation('To', request.destination)
+  cy.get('[aria-label="Select travel date"]', {timeout:15000}).should('be.visible').click()
+
+  const [day, monthNumber, year] = String(request.travelDate).split('/')
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const targetMonth = monthNames[Number(monthNumber) - 1]
+  const targetYear = String(year)
+  const targetDay = String(Number(day))
+  if (!targetMonth) throw new Error('Invalid travelDate: expected DD/MM/YYYY')
+
+  const moveToTargetMonth = (attempt = 0) => {
+    if (attempt > 24) throw new Error('Could not navigate the new IRCTC calendar to ' + targetMonth + ' ' + targetYear)
+    return cy.get('[aria-label="Select travel date"]', {timeout:10000}).then(($button) => {
+      const calendarText = $button.text().replace(/\s+/g, ' ')
+      if (calendarText.includes(targetMonth) && calendarText.includes(targetYear)) return
+      return cy.wrap($button).find('a').last().click().then(() => cy.wait(25).then(() => moveToTargetMonth(attempt + 1)))
+    })
+  }
+  moveToTargetMonth()
+  cy.get('[aria-label="Select travel date"] table a:visible, [aria-label="Select travel date"] [role="gridcell"]:visible', {timeout:10000})
+    .filter((_, el) => String(Cypress.$(el).text()).trim() === targetDay).first().click()
+
+  const quota = String(request.quota || 'GENERAL').toUpperCase()
+  if (quota !== 'GENERAL') {
+    cy.get('[role="combobox"][aria-label="Quota"]', {timeout:10000}).should('be.visible').click()
+    cy.contains('[role="option"], .ui-dropdown-item, .p-dropdown-item, li', quota, {timeout:10000}).filter(':visible').first().click()
+  }
+}
+
 function continuePaymentFlow(request) {
   return cy.get('body', { timeout: 30000 }).then(($body) => {
     const method = String(request.paymentPreference?.method || 'UPI').toUpperCase()
@@ -345,99 +427,7 @@ describe('IRCTC — Autonomous Booking Engine', () => {
         }
       })
 
-      chooseAutocomplete(
-        'From station',
-        [/from/i, /source/i, /origin/i, /select source/i],
-        request.source,
-      )
-
-      chooseAutocomplete(
-        'To station',
-        [/to/i, /destination/i, /select destination/i],
-        request.destination,
-      )
-
-      // Beta uses an accessible date-picker button, not a text input.
-      cy.get('button[aria-label="Select travel date"]', { timeout: 15000 })
-        .should('be.visible')
-        .click()
-
-      const [day, monthNumber, year] = String(request.travelDate).split('/')
-      const monthNames = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ]
-      const targetMonth = monthNames[Number(monthNumber) - 1]
-      const targetYear = String(year)
-      const targetDay = String(Number(day))
-
-      if (!targetMonth || !targetYear || !targetDay) {
-        throw new Error('Invalid travelDate: expected DD/MM/YYYY')
-      }
-
-      const moveToTargetMonth = (attempt = 0) => {
-        if (attempt > 24) {
-          throw new Error(
-            'Could not navigate the IRCTC calendar to ' +
-              targetMonth +
-              ' ' +
-              targetYear,
-          )
-        }
-
-        cy.get('button[aria-label="Select travel date"]', { timeout: 10000 }).then(
-          ($button) => {
-            const calendarText = $button.text().replace(/\s+/g, ' ')
-            if (
-              calendarText.includes(targetMonth) &&
-              calendarText.includes(targetYear)
-            ) {
-              return
-            }
-
-            cy.wrap($button)
-              .find('a')
-              .last()
-              .click()
-
-            return cy.wait(25).then(() => moveToTargetMonth(attempt + 1))
-          },
-        )
-      }
-
-      moveToTargetMonth()
-
-      cy.get('button[aria-label="Select travel date"] table a:visible', {
-        timeout: 10000,
-      })
-        .filter((_, el) => String(Cypress.$(el).text()).trim() === targetDay)
-        .first()
-        .click()
-
-      if (String(request.quota || 'GENERAL').toUpperCase() !== 'GENERAL') {
-        cy.get('[role="combobox"][aria-label="Quota"]', { timeout: 10000 })
-          .should('be.visible')
-          .click()
-
-        cy.contains(
-          '[role="option"], .ui-dropdown-item, .p-dropdown-item, li',
-          String(request.quota),
-          { timeout: 10000 },
-        )
-          .filter(':visible')
-          .first()
-          .click()
-      }
+      prepareJourneyForSurface(request)
 
       completeState('SEARCH', 'PREPARE_JOURNEY', 'Journey inputs prepared')
       currentState = 'SEARCH'
