@@ -1,85 +1,42 @@
 const fs = require('fs')
 const path = require('path')
-const { spawn } = require('child_process')
-
-const requestFile =
-  process.env.BOOKING_REQUEST_FILE || path.join(process.cwd(), 'booking-request.json')
+const { Job } = require('../src/models/Job')
+const { validate, normalize } = require('../src/models/BookingRequest')
+const JobStore = require('../src/persistence/JobStore')
+const Scheduler = require('../src/scheduler/Scheduler')
 
 function readRequest() {
   if (process.env.BOOKING_REQUEST_JSON) {
     return JSON.parse(process.env.BOOKING_REQUEST_JSON)
   }
-  if (!fs.existsSync(requestFile)) {
-    throw new Error('Missing booking request file: ' + requestFile)
+
+  const file = process.env.BOOKING_REQUEST_FILE ||
+    path.join(process.cwd(), 'booking-request.json')
+
+  if (!fs.existsSync(file)) {
+    throw new Error('Missing booking request file: ' + file)
   }
-  return JSON.parse(fs.readFileSync(requestFile, 'utf8'))
+
+  return JSON.parse(fs.readFileSync(file, 'utf8'))
 }
 
-function run() {
-  const request = readRequest()
+async function main() {
+  const raw = readRequest()
+  const errors = validate(raw)
+  if (errors.length) throw new Error(errors.join('; '))
 
-  if (!request.executionMode || request.executionMode === 'NOW') {
-    return runCypress(request)
-  }
+  const request = normalize(raw)
+  const job = new Job(request)
+  JobStore.save(job)
 
-  if (request.executionMode === 'SCHEDULED') {
-    const target = new Date(request.scheduledAt)
-    if (Number.isNaN(target.getTime())) {
-      throw new Error('scheduledAt must be a valid ISO 8601 datetime')
-    }
+  console.log('[AUTO-BOOK] Created job ' + job.id)
+  console.log('[AUTO-BOOK] Mode: ' + request.executionMode)
+  console.log('[AUTO-BOOK] Entry surface: ' + request.entrySurface)
 
-    const delay = Math.max(0, target.getTime() - Date.now())
-    console.log('[AUTO-BOOK] Scheduled for ' + target.toISOString())
-
-    setTimeout(() => {
-      runCypress(request)
-    }, delay)
-    return
-  }
-
-  throw new Error('Unsupported executionMode: ' + request.executionMode)
+  await Scheduler.schedule(job)
 }
 
-function runCypress(request) {
-  const env = {
-    ...process.env,
-    CYPRESS_BOOKING_REQUEST: JSON.stringify(request),
-    CYPRESS_FAST_MODE:
-      process.env.FAST_MODE || (request.fastMode === false ? 'false' : 'true'),
-    CYPRESS_DEBUG_MODE:
-      process.env.DEBUG_MODE || (request.debugMode ? 'true' : 'false'),
-    CYPRESS_IRCTC_ENTRY_URL:
-      process.env.IRCTC_ENTRY_URL ||
-      (request.entrySurface === 'LEGACY'
-        ? 'https://www.irctc.co.in/nget/train-search'
-        : 'https://www.irctc.co.in/eticket/'),
-  }
-
-  const browser = process.env.CYPRESS_BROWSER || request.browser || 'edge'
-  const args = [
-    'cypress',
-    'run',
-    '--headed',
-    '--browser',
-    browser,
-    '--spec',
-    'cypress/e2e/autonomous-booking.cy.js',
-  ]
-
-  const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', args, {
-    cwd: process.cwd(),
-    env,
-    stdio: 'inherit',
-  })
-
-  child.on('close', (code) => {
-    process.exitCode = code === null ? 1 : code
-  })
-}
-
-try {
-  run()
-} catch (error) {
+main().catch(error => {
   console.error('[AUTO-BOOK] ' + error.message)
   process.exitCode = 1
-}
+})
