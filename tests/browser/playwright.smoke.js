@@ -8,7 +8,14 @@ const {
 } = require('../../src/engine/irctc/sessionManager')
 
 ;(async () => {
-  const browser = await chromium.launch({ headless: true })
+  const requested = String(process.env.BROWSER_CHANNEL || 'chromium').trim().toLowerCase()
+  const channel = requested === 'chromium' ? undefined : requested
+  const expectedSessionBrowser = requested === 'msedge' ? 'edge' : requested
+
+  const browser = await chromium.launch({
+    ...(channel ? { channel } : {}),
+    headless: true,
+  })
   const page = await browser.newPage()
   await page.setContent('<main><button type="button">Ready</button><input aria-label="Name" /></main>')
   await page.getByRole('button', { name: 'Ready' }).click()
@@ -17,15 +24,15 @@ const {
   await browser.close()
 
   const request = {
-    credentialsReference: 'playwright-smoke',
-    browser: 'chromium',
+    credentialsReference: 'playwright-smoke-' + requested,
+    browser: requested,
   }
-  const userDataDir = profileDir(request, 'chromium')
+  const userDataDir = profileDir(request, expectedSessionBrowser)
   fs.rmSync(userDataDir, { recursive: true, force: true })
 
   const session = await launchSession({ request, headless: true })
   try {
-    assert.equal(session.browser, 'chromium')
+    assert.equal(session.browser, expectedSessionBrowser)
     assert.equal(session.userDataDir, userDataDir)
     assert.equal(session.page.isClosed(), false)
   } finally {
@@ -33,7 +40,7 @@ const {
     fs.rmSync(userDataDir, { recursive: true, force: true })
   }
 
-  console.log('[SMOKE] Playwright browser launch and persistent session checks passed.')
+  console.log('[SMOKE] Playwright ' + requested + ' launch, locators, and persistent session checks passed.')
 })().catch(error => {
   console.error('[SMOKE] ' + error.stack)
   process.exitCode = 1

@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 const {
+  normalizeBrowser,
+  resolveBrowserCandidates,
   browserConfig,
   configuredBrowser,
   isMissingBrowserExecutable,
@@ -11,6 +13,16 @@ test('browserConfig maps supported browser targets', () => {
   assert.deepEqual(browserConfig('chromium'), {})
   assert.deepEqual(browserConfig('chrome'), { channel: 'chrome' })
   assert.deepEqual(browserConfig('edge'), { channel: 'msedge' })
+})
+
+test('browser policy supports auto discovery with deterministic Chromium fallback', () => {
+  assert.equal(normalizeBrowser(undefined), 'chromium')
+  assert.equal(normalizeBrowser('msedge'), 'edge')
+  assert.equal(normalizeBrowser('auto'), 'auto')
+  assert.deepEqual(resolveBrowserCandidates('chromium'), ['chromium'])
+  assert.deepEqual(resolveBrowserCandidates('chrome'), ['chrome', 'chromium'])
+  assert.deepEqual(resolveBrowserCandidates('edge'), ['edge', 'chromium'])
+  assert.deepEqual(resolveBrowserCandidates('auto'), ['chrome', 'edge', 'chromium'])
 })
 
 test('missing branded browser errors are classified for fallback', () => {

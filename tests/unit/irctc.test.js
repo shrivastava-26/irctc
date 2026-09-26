@@ -4,7 +4,7 @@ const { STATES, classifyState } = require('../../src/engine/BookingStateMachine'
 const { shouldRetry, backoffMs } = require('../../src/engine/RetryPolicy')
 const BookingRequest = require('../../src/models/BookingRequest')
 const { orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
-const { normalizeSurface, detectRuntimeSurfaceFromUrl, parseTravelDate, normalizeAvailability, availabilitySatisfies, parsePnr } = require('../../src/engine/irctc/utils')
+const { normalizeSurface, detectRuntimeSurfaceFromUrl, detectPreSearchSurfaceFromUrl, parseTravelDate, normalizeAvailability, availabilitySatisfies, parsePnr } = require('../../src/engine/irctc/utils')
 
 test('surface model supports Auto, New, Legacy and runtime handoff', () => {
   assert.equal(normalizeSurface(undefined), 'AUTO')
@@ -12,7 +12,9 @@ test('surface model supports Auto, New, Legacy and runtime handoff', () => {
   assert.equal(normalizeSurface('LEGACY'), 'LEGACY')
   assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/eticket/booking/train-list'), 'NEW')
   assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/nget/booking/train-list'), 'LEGACY')
-  assert.equal(detectRuntimeSurfaceFromUrl('https://www.irctc.co.in/eticket/'), 'UNKNOWN')
+  assert.equal(detectPreSearchSurfaceFromUrl('https://www.irctc.co.in/eticket/train-search'), 'NEW')
+  assert.equal(detectPreSearchSurfaceFromUrl('https://www.irctc.co.in/nget/train-search'), 'LEGACY')
+  assert.equal(detectPreSearchSurfaceFromUrl('https://www.irctc.co.in/eticket/'), 'UNKNOWN')
 })
 
 test('travel date validation is exact and calendar-safe', () => {
@@ -88,8 +90,8 @@ test('entry route detection is URL-first and independent of exact ARIA names', a
   const legacy = new IRCTCAdapter({ page: makePage('https://www.irctc.co.in/nget/train-search'), context: {}, request: {}, credentials: {} })
   assert.equal(await legacy.detectPreSearchSurface(), 'LEGACY')
 
-  const modern = new IRCTCAdapter({ page: makePage('https://www.irctc.co.in/eticket/'), context: {}, request: {}, credentials: {} })
-  assert.equal(await modern.detectPreSearchSurface(), 'NEW')
+  const modern = new IRCTCAdapter({ page: makePage('https://www.irctc.co.in/eticket/train-search'), context: {}, request: {}, credentials: {} })
+  assert.equal(await modern.detectPreSearchSurface({ timeoutMs: 50 }), 'NEW')
 })
 
 test('access-denied pages are classified separately from missing-form pages', async () => {
