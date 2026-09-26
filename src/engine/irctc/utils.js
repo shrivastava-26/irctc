@@ -26,6 +26,13 @@ function normalizeSurface(value) {
   return Object.values(SURFACES).includes(normalized) ? normalized : SURFACES.AUTO
 }
 
+function detectRuntimeSurfaceFromUrl(url) {
+  const value = String(url || '')
+  if (/\\/nget\\/booking\\/train-list/i.test(value)) return SURFACES.LEGACY
+  if (/\\/eticket\\/booking\\/train-list/i.test(value)) return SURFACES.NEW
+  return SURFACES.UNKNOWN
+}
+
 function entryUrl(surface) {
   return normalizeSurface(surface) === SURFACES.LEGACY
     ? ENTRY_URLS.LEGACY
@@ -118,6 +125,7 @@ module.exports = {
   CLASS_LABELS,
   normalizeSurface,
   entryUrl,
+  detectRuntimeSurfaceFromUrl,
   parseTravelDate,
   classPattern,
   className,
