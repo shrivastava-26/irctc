@@ -89,7 +89,7 @@ function normalize(data) {
 
   return {
     credentialsReference: data.credentialsReference,
-    executionTarget: 'LOCAL',
+    executionTarget: String(data.executionTarget || 'LOCAL').toUpperCase(),
     entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
     source: String(data.source).toUpperCase(),
     destination: String(data.destination).toUpperCase(),
@@ -113,7 +113,7 @@ function normalize(data) {
     executionMode: data.executionMode || 'NOW',
     scheduledAt: data.scheduledAt || null,
     isMock: Boolean(data.isMock),
-    browser: data.browser || (String(process.env.RENDER || '').toLowerCase() === 'true' ? 'chromium' : 'edge'),
+    browser: data.browser || 'auto',
     fastMode: data.fastMode !== false,
     debugMode: Boolean(data.debugMode),
   }
