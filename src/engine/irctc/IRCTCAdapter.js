@@ -260,40 +260,14 @@ class IRCTCAdapter {
     return String(process.env.RENDER || '').toLowerCase() === 'true' ? 1 : 3
   }
 
-  async selectCandidate(trainNumber, candidate) {
-    let evaluation = null
-    let readError = null
-
+  async probeCandidate(trainNumber, candidate) {
     try {
-      evaluation = await this.inspectAvailability(candidate, { readOnly: true })
+      const evaluation = await this.inspectAvailability(candidate, { readOnly: true })
+      return { trainNumber, candidate, evaluation, error: null }
     } catch (error) {
-      readError = error
+      return { trainNumber, candidate, evaluation: null, error }
     }
-
-    const satisfies = evaluation && pickFirstSatisfied(
-      [evaluation],
-      this.request.availabilityRequirement,
-      availabilitySatisfies,
-    )
-    if (satisfies) return { trainNumber, candidate, evaluation: satisfies }
-
-    // A read-only probe deliberately does not click a refresh/availability control.
-    // If that is required to obtain authoritative availability, fall back to the
-    // existing sequential inspection path for this candidate only.
-    if (readError || evaluation?.availability?.status === 'UNKNOWN') {
-      try {
-        evaluation = await this.inspectAvailability(candidate)
-      } catch (error) {
-        return { trainNumber, candidate, evaluation, error }
-      }
-      if (pickFirstSatisfied([evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
-        return { trainNumber, candidate, evaluation }
-      }
-    }
-
-    return { trainNumber, candidate, evaluation, error: readError }
   }
-
   async chooseSelectedTrain(evaluation, candidate) {
     this.selected = {
       trainNumber: evaluation.trainNumber,
@@ -334,10 +308,11 @@ class IRCTCAdapter {
       const inspected = await Promise.all(batch.map(async number => {
         const candidate = byTrain.get(String(number))
         if (!candidate) return { trainNumber: number, candidate: null, evaluation: null, error: null }
-        return this.selectCandidate(number, candidate)
+        return this.probeCandidate(number, candidate)
       }))
 
       // Preserve configured priority even though the read-only probes complete in parallel.
+      // Any fallback that can click/refresh the page is deliberately serialized here.
       for (const result of inspected) {
         if (!result.candidate) {
           lastReason = 'train ' + result.trainNumber + ' not found'
@@ -346,6 +321,19 @@ class IRCTCAdapter {
 
         if (result.evaluation && pickFirstSatisfied([result.evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
           return this.chooseSelectedTrain(result.evaluation, result.candidate)
+        }
+
+        if (result.error || result.evaluation?.availability?.status === 'UNKNOWN') {
+          try {
+            const fallback = await this.inspectAvailability(result.candidate)
+            if (pickFirstSatisfied([fallback], this.request.availabilityRequirement, availabilitySatisfies)) {
+              return this.chooseSelectedTrain(fallback, result.candidate)
+            }
+            lastReason = 'train ' + result.trainNumber + ' / ' + this.request.coach + ' returned ' + fallback.availability.status
+          } catch (error) {
+            lastReason = 'train ' + result.trainNumber + ' fallback probe failed: ' + error.message
+          }
+          continue
         }
 
         lastReason = result.error
