@@ -5,7 +5,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const RUNS_DIR = path.join(__dirname, '..', '..', '.data', 'automation-runs')
+const RUNS_DIR = path.resolve(process.env.SIVA_DATA_DIR || path.join(__dirname, '..', '..', '.data'), 'automation-runs')
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
