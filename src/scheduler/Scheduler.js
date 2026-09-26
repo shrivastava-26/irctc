@@ -1,5 +1,5 @@
-// Executes persisted hosted jobs. Local-target jobs are owned by the
-// outbound-polling local browser worker and are never launched on Render.
+// Render is the control plane only. Browser execution is owned by the outbound local worker.
+// There is intentionally no hosted browser execution path.
 
 const CredentialManager = require('../security/CredentialManager')
 const { runBooking, runMock } = require('../engine/playwrightRunner')
@@ -33,11 +33,17 @@ function sleep(ms) {
 }
 
 async function schedule(job) {
-  if (String(job.request?.executionTarget || '').toUpperCase() === 'LOCAL') {
-    job.addLog('[SCHEDULER] Local execution selected; waiting for the outbound local browser worker.')
+  if (String(job.request?.executionTarget || '').toUpperCase() !== 'LOCAL') {
+    job.fail('Hosted browser execution is disabled. Start the local browser worker to execute this job.')
     JobStore.save(job)
     return
   }
+
+  job.addLog('[SCHEDULER] Local execution selected; waiting for the outbound local browser worker.')
+  JobStore.save(job)
+  return
+
+  /*
 
   const delayMs = executionStartDelayMs(job.scheduledAt)
 
@@ -52,6 +58,7 @@ async function schedule(job) {
   }
 
   await execute(job)
+  */
 }
 
 async function execute(job) {
@@ -113,7 +120,7 @@ async function recoverPendingJobs() {
 
   const pending = JobStore.findAll()
     .filter(data => (data.status === 'STARTING' || data.status === 'RUNNING'))
-    .filter(data => String(data.request?.executionTarget || 'HOSTED').toUpperCase() !== 'LOCAL')
+    .filter(data => String(data.request?.executionTarget || 'LOCAL').toUpperCase() !== 'LOCAL')
     .map(data => Job.fromJSON(data))
 
   for (const job of pending) {
