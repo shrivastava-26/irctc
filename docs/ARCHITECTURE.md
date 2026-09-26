@@ -1,48 +1,49 @@
 # Autonomous Booking Engine Architecture
 
-## Layers
-
-UI
--> Job request
+## Production architecture
+React UI
+-> Job
 -> Scheduler
--> Cypress adapter
--> Persistent browser state
--> IRCTC web application
+-> BookingStateMachine
+-> RunStateStore
+-> Playwright runner
+-> IRCTC adapter
+-> IRCTC
 
-The UI and scheduler do not contain booking selectors. Cypress owns the browser interaction layer.
+Cypress remains only for legacy/regression compatibility during migration. Scheduler and Job never depend on Cypress APIs.
 
-## State and persistence
+## Surfaces
+The request stores an entry surface: AUTO, NEW, or LEGACY.
+The browser runner detects the runtime surface from the actual URL and DOM after search.
+Supported transitions:
+- NEW entry -> NEW runtime
+- NEW entry -> LEGACY runtime
+- LEGACY entry -> LEGACY runtime
+This is required because live validation showed the new entry can hand off to a legacy/PrimeNG-style train-list route.
 
-Job lifecycle is stored by JobStore. Fine-grained browser execution checkpoints are stored by RunStateStore under .data/automation-runs.
+## Reliability
+BookingStateMachine remains the durable source of truth. Browser objects are disposable and are never durable state.
+RunStateStore and JobStore use atomic file replacement. Recovery never repeats SUBMIT blindly.
+Transaction handling remains: VALIDATE_BOOKING -> SUBMIT -> VERIFY_TRANSACTION -> VERIFY_BOOKING -> SUCCESS.
+Unknown transaction outcomes remain unknown and are reconciled before any further transactional action.
 
-RunStateStore writes state atomically and keeps bounded history. This allows recovery without replaying completed read-only steps.
+## Train selection and availability
+FIXED selects the exact configured train only.
+Preferred/backup selection uses the configured order.
+FIRST_VALID enumerates result containers in result order.
+Availability is read only from the selected train's selected class container. Page-wide AVAILABLE text is not accepted.
+The selected train, train name, class, quota and availability are persisted in runtime metadata.
 
-## Execution
+## Session
+Playwright uses a separate persistent browser profile per account/browser combination under .data/playwright-profiles/.
+The production runner verifies authentication rather than assuming an existing session is valid. Authentication state is never committed to Git.
 
-The autonomous spec is one deterministic state machine. Each state records:
-- start
-- completion/next state
-- telemetry mark
-- diagnostic message
+## Security
+CAPTCHA and OTP are legitimate security challenges. The browser waits for manual completion and resumes the safe state. No OCR, anti-detection flags, guessing or security bypass is used.
 
-## Transaction safety
-
-Search and availability are retryable reads.
-
-Booking submission and payment are transaction-sensitive. If execution stops after a transactional action, the engine verifies current result state before considering another attempt.
-
-An unknown result is preserved as UNKNOWN and is never treated as a safe retry.
-
-## Browser mode
-
-The engine is designed for a normal headed local browser. It does not rely on anti-detection browser flags or CAPTCHA bypass.
-
-Security challenges are legitimate execution boundaries. The browser can wait for challenge completion and then resume the same workflow.
+## Scheduling
+Scheduler persists jobs before waiting. Scheduled jobs start browser preparation during a configurable preparation window and the runner waits only until the exact booking time before the critical sequence.
+Restart recovery reloads STARTING/RUNNING jobs and recalculates the remaining delay.
 
 ## Performance
-
-FAST_MODE controls artifacts and logging overhead. Telemetry measures each state boundary so optimization work is based on observed latency instead of assumptions.
-
-## Current limitation
-
-The public IRCTC Beta entry page is verified. Downstream booking DOM and all transaction responses are not continuously stable and have not been live-verified from this development environment. Selector logic is therefore isolated so it can be updated without changing the engine architecture.
+The design removes arbitrary sleeps from normal browser flow. Playwright actionability, URL waits and scoped locators provide synchronization. Telemetry records state timings so performance claims are measurement-based.
