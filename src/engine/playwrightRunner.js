@@ -173,7 +173,7 @@ async function runBooking(job, credentials, onEvent) {
 
     if (recoveryMode && currentState === 'VERIFY_TRANSACTION') {
       session = await launchSession({
-        request: { ...request, browser: request.browser || 'edge' },
+        request,
         headless: headless(),
         onEvent,
       })
@@ -281,7 +281,7 @@ async function runBooking(job, credentials, onEvent) {
       'Opening selected IRCTC entry surface and restoring persistent browser session.',
       async () => {
         session = await launchSession({
-          request: { ...request, browser: request.browser || 'edge' },
+          request,
           headless: headless(),
           onEvent,
         })
