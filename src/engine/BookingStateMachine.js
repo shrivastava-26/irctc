@@ -30,12 +30,12 @@ const SAFE_RETRY_STATES = new Set([
   'VERIFY_AVAILABILITY',
   'LOAD_PASSENGERS',
   'VALIDATE_BOOKING',
-  'VERIFY_TRANSACTION',
   'VERIFY_BOOKING',
 ])
 
 const MUTATING_STATES = new Set([
   'SUBMIT',
+  'VERIFY_TRANSACTION',
 ])
 
 function indexOfState(state) {
