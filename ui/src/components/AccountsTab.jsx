@@ -118,7 +118,7 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
               <AccountCircleOutlinedIcon />
             </Box>
             <Box minWidth={0}>
-              <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.01em' }}>
+              <Typography className="railx-kicker" sx={{ fontWeight: 800 }}>
                 IRCTC Accounts
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -156,7 +156,7 @@ export default function AccountsTab({ accounts, selectedAccountId, onSave, onSel
       </Paper>
 
       <Paper variant="outlined" sx={{ overflow: 'hidden', borderRadius: 3 }}>
-        <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+        <TableContainer className="railx-table-wrap" sx={{ width: '100%', overflowX: 'auto' }}>
           <Table size="small" sx={{ minWidth: 620 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'action.hover' }}>
