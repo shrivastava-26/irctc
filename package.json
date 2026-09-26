@@ -14,7 +14,7 @@
     "test": "cypress run --browser chrome --headed",
     "test:edge": "cypress run --browser edge --headed",
     "open": "cypress open",
-    "postinstall": "if [ \"$CYPRESS_INSTALL_BINARY\" != \"0\" ]; then npx cypress install; fi",
+    "postinstall": "if [ \"$CYPRESS_INSTALL_BINARY\" != \"0\" ]; then npx cypress install; fi; if [ \"$RENDER\" = \"true\" ]; then PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium; fi",
     "book": "node scripts/auto-book.js",
     "auto-book": "node scripts/auto-book.js",
     "test:unit": "node --test tests/unit/*.test.js",

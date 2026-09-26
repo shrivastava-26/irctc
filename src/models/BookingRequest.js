@@ -139,7 +139,7 @@ function normalize(data) {
     executionMode: data.executionMode || 'NOW',
     scheduledAt: data.scheduledAt || null,
     isMock: Boolean(data.isMock),
-    browser: data.browser || 'edge',
+    browser: data.browser || (String(process.env.RENDER || '').toLowerCase() === 'true' ? 'chromium' : 'edge'),
     fastMode: data.fastMode !== false,
     debugMode: Boolean(data.debugMode),
   }
