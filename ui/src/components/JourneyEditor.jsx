@@ -12,7 +12,6 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
 import StationAutocomplete from './StationAutocomplete'
-import TrainSelector from './TrainSelector'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 
 dayjs.extend(customParseFormat)
@@ -104,7 +103,12 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
         <Grid container spacing={{ xs: 1.25, sm: 2 }} sx={{ mb: 2 }}>
           <Grid item xs={12} sm={3}>
             <Controller name="source" control={control} rules={{ required: 'Required' }} render={({ field }) => (
-              <TextField {...field} label="From" fullWidth error={!!errors.source} placeholder="NDLS" />
+              <StationAutocomplete
+                value={field.value}
+                onChange={field.onChange}
+                label="From"
+                error={errors.source}
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={1} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'center' } }}>
@@ -114,7 +118,12 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
           </Grid>
           <Grid item xs={12} sm={3}>
             <Controller name="destination" control={control} rules={{ required: 'Required' }} render={({ field }) => (
-              <TextField {...field} label="To" fullWidth error={!!errors.destination} placeholder="MMCT" />
+              <StationAutocomplete
+                value={field.value}
+                onChange={field.onChange}
+                label="To"
+                error={errors.destination}
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={5}>
@@ -163,16 +172,18 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
             <Controller name="trainNumber" control={control} rules={{
               validate: value => watch('trainSelectionPolicy') !== 'FIXED' || String(value || '').trim() ? true : 'Required for Fixed Train',
             }} render={({ field }) => (
-              <TrainSelector
-                value={field.value}
-                onChange={(trainNumber) => {
-                  field.onChange(trainNumber)
-                  setValue('trainSelectionPolicy', trainNumber ? 'FIXED' : 'FIRST_VALID')
+              <TextField
+                {...field}
+                label="Train Number"
+                fullWidth
+                placeholder="5-digit train number"
+                inputProps={{ maxLength: 5, inputMode: 'numeric' }}
+                onChange={(event) => {
+                  const value = event.target.value.replace(/\\D/g, '').slice(0, 5)
+                  field.onChange(value)
+                  setValue('trainSelectionPolicy', value ? 'FIXED' : 'FIRST_VALID')
                 }}
-                from={watch('source')}
-                to={watch('destination')}
-                travelDate={watch('travelDate')}
-                travelClass={watch('coach')}
+                helperText="Enter a train number when using Fixed Train"
               />
             )} />
           </Grid>
