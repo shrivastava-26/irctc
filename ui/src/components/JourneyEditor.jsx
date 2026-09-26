@@ -32,10 +32,14 @@ function normalizeTrainNumber(value) {
 function legacySelectedTrains(data) {
   if (Array.isArray(data?.selectedTrains)) return data.selectedTrains
 
-  const values = []
-  if (data?.trainNumber) values.push(String(data.trainNumber))
-  if (Array.isArray(data?.preferredTrains)) values.push(...data.preferredTrains)
-  if (Array.isArray(data?.backupTrains)) values.push(...data.backupTrains)
+  const fixed = String(data?.trainSelectionPolicy || '').toUpperCase() === 'FIXED'
+  const values = fixed && data?.trainNumber
+    ? [String(data.trainNumber)]
+    : [
+        ...(data?.trainNumber ? [String(data.trainNumber)] : []),
+        ...(Array.isArray(data?.preferredTrains) ? data.preferredTrains : []),
+        ...(Array.isArray(data?.backupTrains) ? data.backupTrains : []),
+      ]
 
   const seen = new Set()
   return values
