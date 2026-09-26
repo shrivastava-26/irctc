@@ -6,6 +6,22 @@ const BookingRequest = require('../../src/models/BookingRequest')
 const { orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
 const { normalizeSurface, detectRuntimeSurfaceFromUrl, parseTravelDate, normalizeAvailability, availabilitySatisfies, parsePnr } = require('../../src/engine/irctc/utils')
 
+test('credential registration preserves the eWallet secret in the server session', async () => {
+  const {
+    setCredentials,
+    setEwalletTransactionPassword,
+    getCredentials,
+  } = require('../../src/security/CredentialManager')
+
+  await setEwalletTransactionPassword('wallet-test-user', 'SECRET-123')
+  await setCredentials('wallet-test-user', 'LOGIN-456')
+
+  const credentials = await getCredentials('wallet-test-user')
+  assert.equal(credentials.username, 'wallet-test-user')
+  assert.equal(credentials.password, 'LOGIN-456')
+  assert.equal(credentials.ewalletTransactionPassword, 'SECRET-123')
+})
+
 test('production IRCTC adapters load without syntax errors', () => {
   assert.ok(require('../../src/engine/irctc/NewIRCTCAdapter'))
   assert.ok(require('../../src/engine/irctc/LegacyIRCTCAdapter'))
