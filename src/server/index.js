@@ -9,6 +9,7 @@ const { validate, normalize } = require('../models/BookingRequest')
 const JobStore = require('../persistence/JobStore')
 const Scheduler = require('../scheduler/Scheduler')
 const { authorizeWorker, configuredToken } = require('../security/WorkerAuth')
+const { providerStatus } = require('../engine/rail/HostedRailApi')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -82,17 +83,14 @@ app.post('/jobs', (req, res) => {
     })
   }
 
-  if (String(req.body?.executionTarget || 'LOCAL').toUpperCase() !== 'LOCAL') {
-    return res.status(409).json({ error: 'Hosted browser execution is disabled. RAILX browser jobs must run on the local execution worker.', code: 'LOCAL_EXECUTION_REQUIRED' })
+  const executionTarget = String(req.body?.executionTarget || 'API').toUpperCase()
+  if (!['API', 'LOCAL'].includes(executionTarget)) {
+    return res.status(409).json({ error: 'Unsupported execution target. Use API or LOCAL.', code: 'INVALID_EXECUTION_TARGET' })
   }
 
   const normalized = normalize(req.body)
 
-  // Live IRCTC browser execution must stay on the user's local execution plane.
-  // Render remains the control plane; hosted browser execution is blocked by default.
-  if (!normalized.isMock && normalized.executionTarget === 'HOSTED' && String(process.env.SIVA_ALLOW_HOSTED_BOOKING || '').toLowerCase() !== 'true') {
-    normalized.executionTarget = 'LOCAL'
-  }
+  // Hosted API execution keeps the booking path off Render Chromium and off localhost.
 
   const job = new Job(normalized)
   JobStore.save(job)
@@ -230,6 +228,11 @@ app.post('/worker/jobs/:id/complete', (req, res) => {
   if (!completed.ok) return res.status(completed.status).json({ error: completed.error })
 
   res.json({ job: completed.job })
+})
+
+app.get('/provider/status', (req, res) => {
+  const status = providerStatus()
+  res.status(status.configured ? 200 : 503).json(status)
 })
 
 app.get('/worker/status', (req, res) => {

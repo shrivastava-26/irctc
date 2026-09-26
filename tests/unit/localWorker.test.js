@@ -4,7 +4,7 @@ const test = require('node:test')
 const { normalize, validate } = require('../../src/models/BookingRequest')
 const { constantTimeMatch } = require('../../src/security/WorkerAuth')
 
-test('booking requests accept explicit LOCAL execution target', () => {
+test('booking requests accept API by default and explicit LOCAL execution target', () => {
   const base = {
     credentialsReference: 'account',
     source: 'SMVB',
@@ -16,12 +16,12 @@ test('booking requests accept explicit LOCAL execution target', () => {
 
   assert.deepEqual(validate({ ...base, executionTarget: 'LOCAL' }), [])
   assert.equal(normalize({ ...base, executionTarget: 'LOCAL' }).executionTarget, 'LOCAL')
+  assert.deepEqual(validate({ ...base, executionTarget: 'API' }), [])
+  assert.equal(normalize(base).executionTarget, 'API')
   assert.match(
     validate({ ...base, executionTarget: 'HOSTED' }).join(' '),
-    /executionTarget must be LOCAL; hosted browser execution is disabled/,
+    /executionTarget must be one of: API, LOCAL/,
   )
-  assert.deepEqual(validate({ ...base, executionTarget: 'LOCAL' }), [])
-  assert.equal(normalize(base).executionTarget, 'LOCAL')
 })
 
 test('worker token comparison requires a non-empty exact match', () => {

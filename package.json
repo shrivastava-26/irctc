@@ -23,7 +23,8 @@
     "smoke:playwright": "node tests/browser/playwright.smoke.js",
     "start:local-worker": "node scripts/local-worker.js",
     "test:local-worker": "node --test tests/unit/localWorker.test.js tests/unit/workerQueue.test.js",
-    "setup:local-worker": "node scripts/setup-local-worker.js"
+    "setup:local-worker": "node scripts/setup-local-worker.js",
+    "test:rail-api": "node --test tests/unit/hostedRailApi.test.js"
   },
   "author": "Prince Shrivastava",
   "license": "ISC",

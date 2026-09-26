@@ -28,7 +28,7 @@ export default function App() {
   const [activeJobs, setActiveJobs] = useState([])
   const [showAutomationDialog, setShowAutomationDialog] = useState(false)
   const [selectedJourneyIds, setSelectedJourneyIds] = useState([])
-  const [localWorkerOnline, setLocalWorkerOnline] = useState(false)
+  const [railApiConfigured, setRailApiConfigured] = useState(false)
 
   useEffect(() => {
     const loadedAccounts = loadAccounts().map(account => ({
@@ -53,19 +53,16 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     let timer = null
-
-    const pollWorker = async () => {
+    const pollProvider = async () => {
       try {
-        const response = await fetch(API + '/worker/status', { cache: 'no-store' })
-        const data = response.ok ? await response.json() : null
-        if (!cancelled) setLocalWorkerOnline(Boolean(data?.online))
+        const response = await fetch(API + '/provider/status', { cache: 'no-store' })
+        if (!cancelled) setRailApiConfigured(response.ok)
       } catch {
-        if (!cancelled) setLocalWorkerOnline(false)
+        if (!cancelled) setRailApiConfigured(false)
       }
-      if (!cancelled) timer = window.setTimeout(pollWorker, 10000)
+      if (!cancelled) timer = window.setTimeout(pollProvider, 15000)
     }
-
-    pollWorker()
+    pollProvider()
     return () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
@@ -112,11 +109,6 @@ export default function App() {
       return
     }
 
-    if (!account.password) {
-      toast.error('This account has no password saved. Edit it and save the password.')
-      return
-    }
-
     if (journeys.length === 0) {
       toast.error('No journeys available to run.')
       return
@@ -127,19 +119,13 @@ export default function App() {
       return
     }
 
-    if (!localWorkerOnline) {
-      return
-    }
-
-    // LOCAL execution keeps the account secret on the browser/local machine.
-    // The worker resolves credentials from its own environment or credential file.
     const newJobIds = []
     let started = 0
 
     for (const journey of journeysToAutomate) {
       const payload = {
         credentialsReference: account.username,
-        executionTarget: 'LOCAL',
+        executionTarget: 'API',
         source: String(journey.source || '').toUpperCase(),
         destination: String(journey.destination || '').toUpperCase(),
         travelDate: journey.travelDate || '',
@@ -214,7 +200,7 @@ export default function App() {
               selectedJourneyIds={selectedJourneyIds}
               onSelectionChange={setSelectedJourneyIds}
               activeJobsCount={activeJobs.length}
-              localWorkerOnline={localWorkerOnline}
+              railApiConfigured={railApiConfigured}
               onOpenDialog={() => setShowAutomationDialog(true)}
             />
           )}

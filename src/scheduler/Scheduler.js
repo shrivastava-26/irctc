@@ -6,6 +6,7 @@ const { runBooking, runMock } = require('../engine/playwrightRunner')
 const JobStore = require('../persistence/JobStore')
 const { Job } = require('../models/Job')
 const { JourneyWorkerPool } = require('./JourneyWorkerPool')
+const { runHostedRailBooking } = require('../engine/rail/HostedRailApi')
 
 let recovered = false
 const activeJobs = new Set()
@@ -41,8 +42,8 @@ async function schedule(job) {
     return
   }
 
-  if (target === 'HOSTED' && !job.request?.isMock && String(process.env.SIVA_ALLOW_HOSTED_BOOKING || '').toLowerCase() !== 'true') {
-    job.fail('Hosted live IRCTC browser execution is disabled. Use the local browser worker so IRCTC sees the user network rather than the hosted execution network.')
+  if (target === 'HOSTED') {
+    job.fail('Hosted IRCTC browser execution is disabled. Use executionTarget=API for hosted rail API execution.')
     JobStore.save(job)
     return
   }
@@ -83,19 +84,19 @@ async function execute(job) {
 
     if (job.request.isMock) {
       result = await runMock(job, event => onEngineEvent(job, event))
-      if (result.success && result.pnr) job.complete(result.pnr, result)
-      else job.fail(result.error || 'Mock execution did not verify a result.')
+    } else if (String(job.request.executionTarget).toUpperCase() === 'API') {
+      result = await runHostedRailBooking(job, event => onEngineEvent(job, event))
     } else {
       const credentials = await CredentialManager.getCredentials(job.request.credentialsReference)
       result = await runBooking(job, credentials, event => onEngineEvent(job, event))
+    }
 
-      if (result.success && result.pnr && result.state === 'SUCCESS') {
-        job.complete(result.pnr, result)
-      } else if (result.success) {
-        job.fail('Execution finished without an authoritative SUCCESS state.')
-      } else {
-        job.fail(result.error || 'Playwright booking execution failed.')
-      }
+    if (result?.success && result?.pnr && result?.state === 'SUCCESS') {
+      job.complete(result.pnr, result)
+    } else if (result?.success) {
+      job.fail('Execution finished without an authoritative SUCCESS state.')
+    } else {
+      job.fail(result?.error || 'Booking execution failed.')
     }
   } catch (error) {
     job.fail(error.message)
