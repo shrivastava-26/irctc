@@ -106,6 +106,7 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
       fullWidth
       scroll="paper"
       PaperProps={{
+        className: 'railx-modal',
         sx: {
           m: { xs: 1, sm: 2 },
           width: 'calc(100% - 16px)',
@@ -217,7 +218,7 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
           height: { xs: 190, sm: 240 },
           overflowY: 'auto',
           bgcolor: '#1e1e1e',
-          color: '#d4d4d4',
+          color: '#dce8f6',
           p: { xs: 1, sm: 1.5 },
           fontFamily: 'Consolas, Monaco, monospace',
           fontSize: '0.72rem',
