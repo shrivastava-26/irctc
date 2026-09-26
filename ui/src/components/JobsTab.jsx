@@ -41,7 +41,7 @@ export default function JobsTab() {
       </GlassPanel>
 
       <section className="railx-section" aria-label="Automation history">
-        {jobs.length > 0 ? (
+        {jobs.length ? (
           <div>
             {jobs.slice().reverse().map(job => {
               const pnr = getPnr(job)
@@ -54,24 +54,23 @@ export default function JobsTab() {
                   style={{ width: '100%', border: 0, background: 'transparent', color: 'inherit', textAlign: 'left', cursor: 'pointer', font: 'inherit' }}
                 >
                   <div className="railx-job-grid">
-                    <div>
-                      <div className="railx-field-label">Time</div>
-                      <div className="railx-field-value">{new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div minwidth="0">
+                      <div className="railx-inline-data">
+                        <span className="primary">
+                          <RouteOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.25 }} />
+                          {job.request?.source} → {job.request?.destination}
+                        </span>
+                        <span className="railx-divider-dot">•</span>
+                        <span>{new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="railx-divider-dot">•</span>
+                        <span><TrainOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.2 }} />{job.request?.trainNumber || 'AUTO'}</span>
+                        <span className="railx-divider-dot">•</span>
+                        <span>{job.request?.quota || 'GENERAL'}</span>
+                        <span className="railx-divider-dot">•</span>
+                        <span><ConfirmationNumberOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.2 }} />{pnr || '—'}</span>
+                      </div>
                     </div>
-                    <div>
-                      <div className="railx-field-label">Route</div>
-                      <div className="railx-field-value"><RouteOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.3 }} />{job.request?.source} → {job.request?.destination}</div>
-                    </div>
-                    <div>
-                      <div className="railx-field-label">Train</div>
-                      <div className="railx-field-value"><TrainOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.25 }} />{job.request?.trainNumber || 'AUTO'}</div>
-                    </div>
-                    <div>
-                      <div className="railx-field-label">PNR</div>
-                      <div className="railx-field-value"><ConfirmationNumberOutlinedIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom', mr: 0.25 }} />{pnr || '—'}</div>
-                    </div>
-                    <div>
-                      <div className="railx-field-label">Status</div>
+                    <div className="railx-row-status">
                       <StatusBadge status={job.status} compact />
                     </div>
                   </div>
