@@ -6,11 +6,13 @@ const VALID_PAYMENT_METHODS = ['UPI', 'EWALLET']
 const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
 const VALID_TRAIN_SELECTION = ['FIXED', 'FIRST_VALID']
+const VALID_ENTRY_SURFACES = ['NEW', 'LEGACY']
 
 function validate(data) {
   const errors = []
 
   if (!data.credentialsReference) errors.push('credentialsReference is required')
+  if (data.entrySurface && !VALID_ENTRY_SURFACES.includes(data.entrySurface)) errors.push('entrySurface must be NEW or LEGACY')
   if (!data.source) errors.push('source station code is required')
   if (!data.destination) errors.push('destination station code is required')
   if (!data.travelDate) errors.push('travelDate is required (DD/MM/YYYY)')
@@ -101,6 +103,7 @@ function validate(data) {
 function normalize(data) {
   return {
     credentialsReference: data.credentialsReference,
+    entrySurface: data.entrySurface || 'NEW',
     source: String(data.source).toUpperCase(),
     destination: String(data.destination).toUpperCase(),
     travelDate: data.travelDate,
