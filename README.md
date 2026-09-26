@@ -106,3 +106,32 @@ CAPTCHA, OTP, or the payment boundary for a human to complete.
   (`--headed --browser chrome`), never headless — this repo intentionally
   strips the `--headless` flag in `cypress.config.js` because IRCTC's WAF
   blocks headless/Electron fingerprints.
+
+
+## Autonomous booking engine
+
+The feature branch adds a persistent, state-aware Cypress execution path in cypress/e2e/autonomous-booking.cy.js.
+
+Run preparation:
+
+    npm run prepare
+
+Run the current configured booking request:
+
+    npm run book
+
+Run the scheduler/one-command wrapper:
+
+    npm run auto-book
+
+The autonomous path persists execution checkpoints under .data/automation-runs/<jobId>/state.json, records bounded transition history, and writes timing telemetry.
+
+Configure the request from booking-request.example.json using BOOKING_REQUEST_FILE or BOOKING_REQUEST_JSON. Credentials are supplied through environment variables or the existing server credential reference; do not commit real passwords or payment secrets.
+
+FAST_MODE=true keeps the normal hot path lightweight. DEBUG_MODE=true enables additional diagnostics.
+
+The production workflow treats CAPTCHA/OTP as security challenges rather than attempting to bypass them. A headed browser can remain on the same state while a user completes the challenge, then resume.
+
+Transactional booking and payment states are reconciled before any retry. An unknown outcome is never treated as a safe failure and is never blindly resubmitted.
+
+The existing legacy specs remain in place for backward compatibility.
