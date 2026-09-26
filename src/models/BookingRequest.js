@@ -6,16 +6,22 @@ const VALID_PAYMENT_METHODS = ['UPI', 'EWALLET']
 const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
 const VALID_TRAIN_SELECTION = ['FIXED', 'FIRST_VALID']
+const VALID_ENTRY_SURFACES = ['AUTO', 'NEW', 'LEGACY']
 const VALID_ENTRY_SURFACES = ['NEW', 'LEGACY']
 
 function validate(data) {
   const errors = []
 
   if (!data.credentialsReference) errors.push('credentialsReference is required')
+
+  if (data.entrySurface && !VALID_ENTRY_SURFACES.includes(String(data.entrySurface).toUpperCase())) {
+    errors.push('entrySurface must be one of: AUTO, NEW, LEGACY')
+  }
   if (data.entrySurface && !VALID_ENTRY_SURFACES.includes(data.entrySurface)) errors.push('entrySurface must be NEW or LEGACY')
   if (!data.source) errors.push('source station code is required')
   if (!data.destination) errors.push('destination station code is required')
   if (!data.travelDate) errors.push('travelDate is required (DD/MM/YYYY)')
+  else if (!/^\d{2}\/\d{2}\/\d{4}$/.test(String(data.travelDate))) errors.push('travelDate must use DD/MM/YYYY')
   if (!data.coach) errors.push('coach/class is required (for example SL)')
   if (
     !Array.isArray(data.passengers) ||
@@ -28,7 +34,7 @@ function validate(data) {
     data.trainNumber ||
     (Array.isArray(data.preferredTrains) && data.preferredTrains.length > 0) ||
     (Array.isArray(data.backupTrains) && data.backupTrains.length > 0)
-  const selectionPolicy = data.trainSelectionPolicy || 'FIRST_VALID'
+  const selectionPolicy = String(data.trainSelectionPolicy || 'FIRST_VALID').toUpperCase()
 
   if (!VALID_TRAIN_SELECTION.includes(selectionPolicy)) {
     errors.push('trainSelectionPolicy must be one of: ' + VALID_TRAIN_SELECTION.join(', '))
@@ -38,7 +44,7 @@ function validate(data) {
     errors.push('trainNumber or preferredTrains/backupTrains is required when trainSelectionPolicy is FIXED')
   }
 
-  if (data.quota && !VALID_QUOTAS.includes(data.quota)) {
+  if (data.quota && !VALID_QUOTAS.includes(String(data.quota).toUpperCase())) {
     errors.push('quota must be one of: ' + VALID_QUOTAS.join(', '))
   }
 
@@ -103,11 +109,11 @@ function validate(data) {
 function normalize(data) {
   return {
     credentialsReference: data.credentialsReference,
-    entrySurface: data.entrySurface || 'NEW',
+    entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
     source: String(data.source).toUpperCase(),
     destination: String(data.destination).toUpperCase(),
     travelDate: data.travelDate,
-    quota: data.quota || 'GENERAL',
+    quota: String(data.quota || 'GENERAL').toUpperCase(),
     trainNumber: data.trainNumber ? String(data.trainNumber) : null,
     preferredTrains: Array.isArray(data.preferredTrains)
       ? data.preferredTrains.map(String)
@@ -115,7 +121,7 @@ function normalize(data) {
     backupTrains: Array.isArray(data.backupTrains)
       ? data.backupTrains.map(String)
       : [],
-    trainSelectionPolicy: data.trainSelectionPolicy || 'FIRST_VALID',
+    trainSelectionPolicy: selectionPolicy,
     coach: String(data.coach).toUpperCase(),
     boardingStation: data.boardingStation
       ? String(data.boardingStation).toUpperCase()
