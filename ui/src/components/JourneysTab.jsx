@@ -40,7 +40,7 @@ export default function JourneysTab({ journeys, onSave }) {
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexWrap: 'wrap', gap: 1, mb: 2 }}>
-        <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' }, fontWeight: 'bold' }}>
+        <Typography className="railx-kicker" sx={{ fontSize: { xs: '1rem', sm: '1.1rem' }, fontWeight: 'bold' }}>
           PLANNED JOURNEYS
         </Typography>
 
@@ -49,9 +49,9 @@ export default function JourneysTab({ journeys, onSave }) {
         </Button>
       </Box>
 
-      <Stack spacing={1.5}>
+      <Stack spacing={1.25} className="railx-list">
         {journeys.map(journey => (
-          <Paper key={journey.id} variant="outlined" sx={{
+          <Paper key={journey.id} className="railx-list-card" variant="outlined" sx={{
             p: { xs: 1.25, sm: 1.5 },
             display: 'flex',
             justifyContent: 'space-between',
@@ -85,7 +85,7 @@ export default function JourneysTab({ journeys, onSave }) {
         ))}
 
         {journeys.length === 0 && (
-          <Paper variant="outlined" sx={{ py: 4, px: 2, textAlign: 'center', color: 'text.secondary' }}>
+          <Paper className="railx-empty-state" variant="outlined" sx={{ py: 5, px: 2, textAlign: 'center', color: 'text.secondary' }}>
             No journeys planned. Click "Add Journey" to create one.
           </Paper>
         )}
