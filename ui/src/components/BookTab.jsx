@@ -15,6 +15,7 @@ export default function BookTab({
   journeys,
   onStart,
   activeJobsCount,
+  localWorkerOnline = false,
   selectedJourneyIds = [],
   onSelectionChange,
   onOpenDialog,
@@ -74,9 +75,9 @@ export default function BookTab({
 
           <Stack direction="row" spacing={0.8} flexWrap="wrap" justifyContent="flex-end">
             <Chip
-              label="LOCAL BROWSER"
+              label={localWorkerOnline ? 'LOCAL BROWSER · ONLINE' : 'LOCAL BROWSER · OFFLINE'}
               size="small"
-              color="success"
+              color={localWorkerOnline ? 'success' : 'warning'}
               variant="outlined"
               sx={{ fontWeight: 850 }}
             />
