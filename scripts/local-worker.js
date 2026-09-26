@@ -46,6 +46,8 @@ const POLL_MS = positiveInt(process.env.SIVA_WORKER_POLL_MS, 2000)
 const HEARTBEAT_MS = positiveInt(process.env.SIVA_WORKER_HEARTBEAT_MS, 15000)
 const LEASE_MS = Math.max(HEARTBEAT_MS * 3, positiveInt(process.env.SIVA_WORKER_LEASE_MS, 60000))
 const CONCURRENCY = positiveInt(process.env.SIVA_WORKER_CONCURRENCY, 1)
+const RUN_PREFLIGHT = String(process.env.SIVA_PREFLIGHT || '').toLowerCase() === 'true'
+const ENFORCE_PREFLIGHT = String(process.env.SIVA_ENFORCE_PREFLIGHT || '').toLowerCase() === 'true'
 
 if (!WORKER_TOKEN) {
   console.error('[LOCAL-WORKER] Missing SIVA_WORKER_TOKEN.')
@@ -216,11 +218,23 @@ async function runJob(job) {
       message: '[LOCAL-WORKER] Claimed by ' + WORKER_ID + ' on the local execution plane.',
     })
 
-    if (!job.request.isMock) {
+    if (!job.request.isMock && RUN_PREFLIGHT) {
       const preflight = await ensureIRCTCAccess(job.request, event => emitEvent(job, event))
-      if (!preflight.ok) {
+      if (!preflight.ok && ENFORCE_PREFLIGHT) {
         throw new Error(preflight.reason)
       }
+      if (!preflight.ok) {
+        await emitEvent(job, {
+          type: 'LOG',
+          message: '[PREFLIGHT] Access check did not pass; continuing to the real headed local browser because preflight enforcement is disabled.',
+          metadata: { enforced: false, result: preflight },
+        })
+      }
+    } else if (!job.request.isMock) {
+      await emitEvent(job, {
+        type: 'LOG',
+        message: '[PREFLIGHT] Skipped on live jobs. The execution browser is the source of truth for IRCTC access.',
+      })
     }
 
     const credentials = job.request.isMock
