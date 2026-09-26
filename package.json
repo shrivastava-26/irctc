@@ -1,7 +1,7 @@
 {
-  "name": "irctc-cypress-automation",
+  "name": "irctc-booking-automation",
   "version": "3.0.5",
-  "description": "IRCTC Ticket Booking Automation — Tatkal, Premium Tatkal, General",
+  "description": "IRCTC Ticket Booking Automation with Playwright production runner and Cypress legacy compatibility",
   "scripts": {
     "build": "npm --prefix ui install --include=dev && npm --prefix ui run build",
     "start": "node render-start.js",
@@ -15,10 +15,12 @@
     "test:edge": "cypress run --browser edge --headed",
     "open": "cypress open",
     "postinstall": "if [ \"$CYPRESS_INSTALL_BINARY\" != \"0\" ]; then npx cypress install; fi",
-    "prepare": "node scripts/prepare.js",
     "book": "node scripts/auto-book.js",
     "auto-book": "node scripts/auto-book.js",
-    "test:unit": "node --test tests/unit/*.test.js"
+    "test:unit": "node --test tests/unit/*.test.js",
+    "prepare-booking": "node scripts/prepare.js",
+    "playwright:install": "npx playwright install --with-deps chromium",
+    "smoke:playwright": "node tests/browser/playwright.smoke.js"
   },
   "author": "Prince Shrivastava",
   "license": "ISC",
@@ -29,6 +31,7 @@
     "dayjs": "^1.11.13",
     "express": "^5.2.1",
     "uuid": "^8.3.2",
-    "wait-on": "^8.0.5"
+    "wait-on": "^8.0.5",
+    "playwright": "^1.63.0"
   }
 }
