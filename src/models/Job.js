@@ -52,15 +52,16 @@ class Job {
     this._addEvent({ type: 'STATE_CHANGED', state: newState, message })
   }
 
-  complete(pnr) {
+  complete(pnr, result = null) {
     this.status = JOB_STATUS.COMPLETED
     this.completedAt = new Date().toISOString()
-    this.currentState = 'BOOKING_CONFIRMED'
+    this.currentState = 'SUCCESS'
     this._addEvent({
       type: 'STATUS_CHANGED',
-      state: 'BOOKING_CONFIRMED',
+      state: 'SUCCESS',
       jobStatus: JOB_STATUS.COMPLETED,
       pnr: pnr || null,
+      metadata: result || null,
     })
   }
 
