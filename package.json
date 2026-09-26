@@ -16,7 +16,7 @@
     "open": "cypress open",
     "postinstall": "if [ \"$CYPRESS_INSTALL_BINARY\" != \"0\" ]; then npx cypress install; fi",
     "prepare": "node scripts/prepare.js",
-    "book": "cypress run --headed --browser edge --spec cypress/e2e/autonomous-booking.cy.js",
+    "book": "node scripts/auto-book.js",
     "auto-book": "node scripts/auto-book.js",
     "test:unit": "node --test tests/unit/*.test.js"
   },
