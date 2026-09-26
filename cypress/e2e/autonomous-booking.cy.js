@@ -115,9 +115,15 @@ function visibleInputsMatching(patterns) {
   })
 }
 
-function chooseAutocomplete(patterns, value) {
+function chooseAutocomplete(ariaLabel, patterns, value) {
+  cy.get('[role="combobox"][aria-label="' + ariaLabel + '"]', {
+    timeout: 15000,
+  })
+    .should('be.visible')
+    .click()
+
   visibleInputsMatching(patterns)
-    .first()
+    .last()
     .should('be.visible')
     .clear()
     .type(String(value).slice(0, 4))
@@ -286,33 +292,53 @@ describe('IRCTC — Autonomous Booking Engine', () => {
       })
 
       chooseAutocomplete(
+        'From station',
         [/from/i, /source/i, /origin/i, /select source/i],
         request.source,
       )
 
       chooseAutocomplete(
+        'To station',
         [/to/i, /destination/i, /select destination/i],
         request.destination,
       )
 
-      visibleInputsMatching([
-        /journey.*date/i,
-        /^date$/i,
-        /jrdate/i,
-        /select date/i,
-      ])
-        .first()
+      // Beta uses an accessible date-picker button, not a text input.
+      cy.get('button[aria-label="Select travel date"]', { timeout: 15000 })
         .should('be.visible')
-        .clear()
-        .type(request.travelDate)
+        .click()
+
+      const targetMonth = 'November'
+      const targetYear = '2026'
+
+      const moveToTargetMonth = () => {
+        cy.get('button[aria-label="Select travel date"]', { timeout: 10000 }).then(
+          ($button) => {
+            const calendarText = $button.text().replace(/\s+/g, ' ')
+            if (calendarText.includes(targetMonth + targetYear)) return
+
+            cy.wrap($button)
+              .find('a')
+              .last()
+              .click()
+
+            return cy.wait(50).then(moveToTargetMonth)
+          },
+        )
+      }
+
+      moveToTargetMonth()
+
+      cy.get('button[aria-label="Select travel date"] table a:visible', {
+        timeout: 10000,
+      })
+        .filter((_, el) => String(Cypress.$(el).text()).trim() === '26')
+        .first()
+        .click()
 
       if (String(request.quota || 'GENERAL').toUpperCase() !== 'GENERAL') {
-        cy.get(
-          '#journeyQuota .ui-dropdown, [id="journeyQuota"] .ui-dropdown, p-dropdown',
-          { timeout: 10000 },
-        )
-          .filter(':visible')
-          .first()
+        cy.get('[role="combobox"][aria-label="Quota"]', { timeout: 10000 })
+          .should('be.visible')
           .click()
 
         cy.contains(
