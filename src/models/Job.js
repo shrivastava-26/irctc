@@ -29,6 +29,20 @@ class Job {
     })
   }
 
+  static fromJSON(data) {
+    const job = Object.create(Job.prototype)
+    job.id = data.id
+    job.createdAt = data.createdAt
+    job.scheduledAt = data.scheduledAt || null
+    job.status = data.status || JOB_STATUS.STARTING
+    job.request = data.request || {}
+    job.currentState = data.currentState || 'JOB_CREATED'
+    job.progressEvents = Array.isArray(data.progressEvents) ? data.progressEvents : []
+    job.errorInformation = data.errorInformation || null
+    job.completedAt = data.completedAt || null
+    return job
+  }
+
   addLog(message) {
     this._addEvent({ type: 'LOG', state: this.currentState, message })
   }
