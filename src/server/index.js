@@ -2,6 +2,7 @@
 // Job Manager HTTP API. This module can also be required by render-start.js.
 
 const express = require('express')
+const path = require('path')
 const cors = require('cors')
 const { Job } = require('../models/Job')
 const { validate, normalize } = require('../models/BookingRequest')
@@ -110,6 +111,10 @@ app.post('/jobs/:id/events', (req, res) => {
   res.status(201).json({ ok: true })
 })
 
+// Serve the production Vite build from the same origin as the API.
+// This is required for the Render web service, which runs only the Node server.
+const uiDistPath = path.join(__dirname, '../../ui/dist')
+
 app.get('/credentials', async (req, res) => {
   const { listCredentialReferences } = require('../security/CredentialManager')
   res.json({ accounts: await listCredentialReferences() })
@@ -135,6 +140,15 @@ app.post('/credentials', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// Static UI and SPA fallback must come after API routes.
+app.use(express.static(uiDistPath))
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/jobs') || req.path.startsWith('/credentials')) {
+    return next()
+  }
+  res.sendFile(path.join(uiDistPath, 'index.html'))
 })
 
 if (require.main === module || process.env.RUN_JOB_MANAGER !== 'false') {
