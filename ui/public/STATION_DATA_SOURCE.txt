@@ -1,0 +1,5 @@
+Station directory source: @railroute-ts/india / mayurrawte/railroutes
+Upstream dataset: Indian Railways mainline station data with station codes and names.
+Source revision used for this feature branch: current main package data as retrieved during implementation.
+License: ODbL-1.0 for the data; see the upstream repository for attribution and license details.
+Repository: https://github.com/mayurrawte/railroutes/tree/main/packages/india
