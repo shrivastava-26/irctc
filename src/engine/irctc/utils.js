@@ -28,8 +28,15 @@ function normalizeSurface(value) {
 
 function detectRuntimeSurfaceFromUrl(url) {
   const value = String(url || '')
-  if (/\/nget\/booking\/train-list/i.test(value)) return SURFACES.LEGACY
-  if (/\/eticket\/booking\/train-list/i.test(value)) return SURFACES.NEW
+  if (/\/nget\/booking\/train-list(?:\/|$)/i.test(value)) return SURFACES.LEGACY
+  if (/\/eticket\/booking\/train-list(?:\/|$)/i.test(value)) return SURFACES.NEW
+  return SURFACES.UNKNOWN
+}
+
+function detectPreSearchSurfaceFromUrl(url) {
+  const value = String(url || '')
+  if (/\/nget\/(?:booking\/)?train-search(?:\/|$)/i.test(value)) return SURFACES.LEGACY
+  if (/\/eticket\/(?:booking\/)?train-search(?:\/|$)/i.test(value)) return SURFACES.NEW
   return SURFACES.UNKNOWN
 }
 
@@ -125,6 +132,7 @@ module.exports = {
   normalizeSurface,
   entryUrl,
   detectRuntimeSurfaceFromUrl,
+  detectPreSearchSurfaceFromUrl,
   parseTravelDate,
   classPattern,
   className,
