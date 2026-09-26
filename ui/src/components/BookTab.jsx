@@ -134,8 +134,7 @@ export default function BookTab({
                 {(journey.passengers && journey.passengers.length) || 0} Passenger(s)
                 {journey.upiId ? ' · UPI configured' : ''}
               </Typography>
-                </Box>
-              </Box>
+            </Box>
 
             <Typography
               variant="caption"
