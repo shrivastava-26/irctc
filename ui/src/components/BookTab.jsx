@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo } from 'react'
-import { Box, Paper, Stack, Typography, Button, Checkbox, FormControlLabel } from '@mui/material'
+import { Box, Paper, Stack, Typography, Button, Checkbox, Chip } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
+import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined'
 
 export default function BookTab({
   accounts,
@@ -12,7 +15,7 @@ export default function BookTab({
   onSelectionChange,
   onOpenDialog,
 }) {
-  const selectedAcc = accounts.find(account => account.id === selectedAccountId)
+  const selectedAcc = accounts.find(account => String(account.id) === String(selectedAccountId))
   const selectedSet = useMemo(() => new Set(selectedJourneyIds.map(String)), [selectedJourneyIds])
 
   useEffect(() => {
@@ -33,163 +36,199 @@ export default function BookTab({
 
   const selectAll = () => onSelectionChange?.(journeys.map(journey => journey.id))
   const clearAll = () => onSelectionChange?.([])
-
   const selectedCount = selectedJourneyIds.length
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto', minWidth: 0 }}>
+    <Box sx={{ width: '100%', maxWidth: 920, mx: 'auto', minWidth: 0 }}>
       <Paper
         variant="outlined"
         sx={{
-          p: { xs: 1.25, sm: 1.5 },
-          mb: { xs: 2, sm: 3 },
-          display: 'flex',
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: 0.75,
-          bgcolor: '#f0f4f8',
-          overflowWrap: 'anywhere',
+          mb: 2,
+          p: { xs: 1.5, sm: 2 },
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(33,61,119,0.08), rgba(251,121,43,0.06))',
+          borderColor: 'rgba(33,61,119,0.12)',
         }}
       >
-        <Typography variant="body2" color="text.secondary">Account:</Typography>
-        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 0, overflowWrap: 'anywhere' }}>
-          {selectedAcc
-            ? selectedAcc.label + ' (' + selectedAcc.username + ')'
-            : 'None Selected (Go to ACCOUNTS tab)'}
-        </Typography>
-      </Paper>
-
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: { xs: 'flex-start', sm: 'center' },
-        gap: 1,
-        mb: 1.5,
-        flexWrap: 'wrap',
-      }}>
-        <Box>
-          <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
-            READY JOURNEYS
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Select the journey(s) you want to automate.
-          </Typography>
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 0.5, width: { xs: '100%', sm: 'auto' }, justifyContent: 'flex-end' }}>
-          <Button variant="text" size="small" onClick={selectAll} disabled={journeys.length === 0}>
-            SELECT ALL
-          </Button>
-          <Button variant="text" size="small" onClick={clearAll} disabled={selectedCount === 0}>
-            CLEAR
-          </Button>
-        </Box>
-
-        {activeJobsCount > 0 && (
-          <Button
-            variant="text"
-            size="small"
-            onClick={onOpenDialog}
-            sx={{ width: { xs: '100%', sm: 'auto' } }}
-          >
-            VIEW RUNNING JOBS ({activeJobsCount})
-          </Button>
-        )}
-      </Box>
-
-      <Stack spacing={1} sx={{ mb: 3 }}>
-        {journeys.map(journey => (
-          <Paper
-            key={journey.id}
-            variant="outlined"
+        <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
+          <Box
             sx={{
-              p: { xs: 1.25, sm: 1.5 },
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              flexDirection: { xs: 'column', sm: 'row' },
-              gap: 1,
-              minWidth: 0,
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              display: 'grid',
+              placeItems: 'center',
+              bgcolor: 'primary.main',
+              color: 'common.white',
+              flexShrink: 0,
             }}
           >
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem',
-                  overflowWrap: 'anywhere',
-                  lineHeight: 1.5,
-                }}
-              >
-                {journey.trainNumber + ' · ' +
-                  journey.source + ' → ' +
-                  journey.destination + ' · ' +
-                  journey.travelDate + ' · ' +
-                  journey.coach + ' · ' +
-                  journey.quota}
-              </Typography>
+            <ManageAccountsOutlinedIcon />
+          </Box>
+          <Box minWidth={0}>
+            <Typography variant="caption" color="text.secondary">Account</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 800, overflowWrap: 'anywhere' }}>
+              {selectedAcc
+                ? selectedAcc.label + ' (' + selectedAcc.username + ')'
+                : 'No account selected'}
+            </Typography>
+          </Box>
+        </Stack>
+      </Paper>
 
-              <Typography variant="caption" color="text.secondary">
-                {(journey.passengers && journey.passengers.length) || 0} Passenger(s)
-                {journey.upiId ? ' · UPI configured' : ''}
-              </Typography>
-            </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 1,
+          mb: 1.5,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Box>
+          <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 800 }}>
+            Ready journeys
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Tick one journey or multiple journeys to automate.
+          </Typography>
+        </Box>
 
-            <Typography
-              variant="caption"
+        <Stack direction="row" spacing={0.5} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'initial' } }}>
+          <Button variant="text" size="small" onClick={selectAll} disabled={journeys.length === 0}>Select all</Button>
+          <Button variant="text" size="small" onClick={clearAll} disabled={selectedCount === 0}>Clear</Button>
+          {activeJobsCount > 0 && (
+            <Button variant="outlined" size="small" onClick={onOpenDialog}>
+              Running ({activeJobsCount})
+            </Button>
+          )}
+        </Stack>
+      </Box>
+
+      <Stack spacing={1.25} sx={{ mb: 3 }}>
+        {journeys.map(journey => {
+          const checked = selectedSet.has(String(journey.id))
+          return (
+            <Paper
+              key={journey.id}
+              variant="outlined"
+              onClick={() => toggleJourney(journey.id)}
               sx={{
-                fontWeight: 'bold',
-                color: 'success.main',
-                px: 1,
-                py: 0.5,
-                bgcolor: '#e8f5e9',
-                borderRadius: 1,
-                flexShrink: 0,
+                p: { xs: 1.25, sm: 1.5 },
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                gap: 1,
+                minWidth: 0,
+                cursor: 'pointer',
+                transition: 'border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease',
+                borderColor: checked ? 'secondary.main' : 'divider',
+                boxShadow: checked ? '0 6px 18px rgba(251,121,43,0.12)' : 'none',
+                '&:hover': { boxShadow: '0 8px 22px rgba(33,61,119,0.08)' },
               }}
             >
-              READY
-            </Typography>
-          </Paper>
-        ))}
+              <Checkbox
+                checked={checked}
+                onChange={() => toggleJourney(journey.id)}
+                onClick={event => event.stopPropagation()}
+                inputProps={{ 'aria-label': 'Select journey ' + journey.source + ' to ' + journey.destination }}
+                color="secondary"
+                size="small"
+                sx={{ mt: { xs: -0.5, sm: 0 } }}
+              />
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 800, fontSize: '0.87rem', overflowWrap: 'anywhere', lineHeight: 1.5 }}
+                >
+                  {journey.trainNumber || 'AUTO'} · {journey.source} → {journey.destination}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, overflowWrap: 'anywhere' }}>
+                  {journey.travelDate} · {journey.coach} · {journey.quota}
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 0.6 }}>
+                  <Chip
+                    icon={<EventNoteOutlinedIcon />}
+                    label={(journey.passengers?.length || 0) + ' passenger' + ((journey.passengers?.length || 0) === 1 ? '' : 's')}
+                    size="small"
+                    variant="outlined"
+                    sx={{ height: 24, fontSize: '0.68rem' }}
+                  />
+                  {journey.upiId && (
+                    <Chip label="UPI ready" size="small" color="success" variant="outlined" sx={{ height: 24, fontSize: '0.68rem' }} />
+                  )}
+                </Stack>
+              </Box>
+
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 800,
+                  color: 'success.dark',
+                  px: 1,
+                  py: 0.55,
+                  bgcolor: 'success.light',
+                  borderRadius: 99,
+                  flexShrink: 0,
+                  alignSelf: { xs: 'flex-start', sm: 'center' },
+                }}
+              >
+                READY
+              </Typography>
+            </Paper>
+          )
+        })}
 
         {journeys.length === 0 && (
-          <Paper variant="outlined" sx={{ py: 3, px: 2, textAlign: 'center', color: 'text.secondary' }}>
-            <Typography variant="body2">No ready journeys.</Typography>
-            <Typography variant="caption">Plan your journey in the JOURNEYS tab.</Typography>
+          <Paper variant="outlined" sx={{ py: 7, px: 2, textAlign: 'center', borderRadius: 3 }}>
+            <AddCircleOutlineIcon sx={{ fontSize: 42, color: 'text.disabled', mb: 0.5 }} />
+            <Typography variant="body2" fontWeight={700}>No ready journeys</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Create one in the Journeys tab before starting automation.
+            </Typography>
           </Paper>
         )}
       </Stack>
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: { xs: 2, sm: 4 }, px: 1 }}>
-        <Button
-          fullWidth
-          variant="contained"
-          color="secondary"
-          size="large"
-          startIcon={<PlayArrowIcon />}
-          onClick={onStart}
-          disabled={!selectedAcc || selectedCount === 0}
-          sx={{
-            maxWidth: 420,
-            px: 4,
-            py: 1.25,
-            minHeight: 48,
-          }}
-        >
-          START AUTOMATION
-        </Button>
-      </Box>
-
-      {journeys.length > 0 && (
-        <Typography variant="caption" color={selectedCount > 0 ? 'text.secondary' : 'warning.main'} sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-          {selectedCount === 0
-            ? 'Select at least one journey before starting automation.'
-            : selectedCount === 1
-              ? '1 journey selected — only that journey will be automated.'
-              : selectedCount + ' journeys selected — all selected journeys will be automated.'}
-        </Typography>
-      )}
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 1.25, sm: 1.5 },
+          borderRadius: 3,
+          position: 'sticky',
+          bottom: 12,
+          zIndex: 3,
+          backdropFilter: 'blur(10px)',
+          backgroundColor: 'rgba(255,255,255,0.92)',
+        }}
+      >
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
+            {selectedCount === 0
+              ? 'Select a journey to enable automation.'
+              : selectedCount === 1
+                ? '1 journey selected — only that journey will run.'
+                : selectedCount + ' journeys selected — all selected journeys will run.'}
+          </Typography>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="large"
+            startIcon={<PlayArrowIcon />}
+            onClick={() => onStart(selectedJourneyIds)}
+            disabled={!selectedAcc || selectedCount === 0}
+            sx={{
+              minHeight: 48,
+              minWidth: { xs: '100%', sm: 230 },
+              fontWeight: 800,
+              boxShadow: '0 8px 22px rgba(251,121,43,0.22)',
+            }}
+          >
+            Start automation
+          </Button>
+        </Stack>
+      </Paper>
     </Box>
   )
 }

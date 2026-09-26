@@ -19,22 +19,34 @@ function rankStations(stations, query) {
   const needle = String(query || '').trim().toUpperCase()
   if (!needle) return []
 
-  return stations
-    .map(station => {
-      const code = String(station.code || '').toUpperCase()
-      const name = String(station.name || '').toUpperCase()
-      let rank = 99
-      if (code === needle) rank = 0
-      else if (code.startsWith(needle)) rank = 1
-      else if (name.startsWith(needle)) rank = 2
-      else if (name.includes(needle)) rank = 3
-      else if (code.includes(needle)) rank = 4
-      return { station, rank }
-    })
-    .filter(item => item.rank < 99)
-    .sort((a, b) => itemSort(a, b))
-    .slice(0, 15)
-    .map(item => item.station)
+  const ranked = []
+
+  for (const station of stations) {
+    const code = String(station.code || '').toUpperCase()
+    const name = String(station.name || '').toUpperCase()
+    let rank = 99
+
+    if (code === needle) rank = 0
+    else if (code.startsWith(needle)) rank = 1
+    else if (name.startsWith(needle)) rank = 2
+    else if (name.includes(needle)) rank = 3
+    else if (code.includes(needle)) rank = 4
+
+    if (rank === 99) continue
+
+    const candidate = { station, rank }
+    const insertAt = ranked.findIndex(item => itemSort(candidate, item) < 0)
+
+    if (insertAt === -1) {
+      if (ranked.length < 15) ranked.push(candidate)
+      continue
+    }
+
+    ranked.splice(insertAt, 0, candidate)
+    if (ranked.length > 15) ranked.pop()
+  }
+
+  return ranked.map(item => item.station)
 }
 
 function itemSort(a, b) {
@@ -101,7 +113,6 @@ export default function StationAutocomplete({
       getOptionLabel={option => option ? option.name + ' (' + option.code + ')' : ''}
       noOptionsText={loadError || (inputValue ? 'No matching stations' : 'Type a station name or code')}
       loadingText="Loading stations…"
-      onOpen={() => loadStations().catch(() => {})}
       onInputChange={(_, nextValue, reason) => {
         setInputValue(nextValue)
         const selectedLabel = selected ? selected.name + ' (' + selected.code + ')' : ''

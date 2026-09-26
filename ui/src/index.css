@@ -11,8 +11,12 @@ html {
 body {
   margin: 0;
   padding: 0;
-  background: #f4f6f8;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top left, rgba(33, 61, 119, 0.07), transparent 34rem),
+    #f6f8fc;
   overflow-x: hidden;
+  color: #243047;
 }
 
 *,
@@ -29,6 +33,10 @@ button, input, textarea, select {
   font: inherit;
 }
 
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .MuiDialogContent-root {
   overflow-x: hidden;
 }
@@ -37,13 +45,14 @@ button, input, textarea, select {
   -webkit-overflow-scrolling: touch;
 }
 
+.MuiInputBase-root,
+.MuiButtonBase-root {
+  -webkit-tap-highlight-color: transparent;
+}
+
 @media (max-width: 600px) {
   .MuiTableCell-root {
-    padding: 7px 8px !important;
-  }
-
-  .MuiTypography-h6 {
-    font-size: 1rem !important;
+    padding: 8px 10px !important;
   }
 
   .MuiButton-root {
@@ -52,5 +61,14 @@ button, input, textarea, select {
 
   .MuiPaper-root {
     max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
