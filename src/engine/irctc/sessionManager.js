@@ -84,7 +84,7 @@ async function launchSession({ request, headless = false, onEvent }) {
   onEvent?.({
     type: 'LOG',
     message: '[BROWSER] requested=' + requestedBrowser + '; candidates=' + candidates.join(','),
-    metadata: { requestedBrowser, candidates },
+    metadata: { requestedBrowser, candidates, headless },
   })
 
   for (let index = 0; index < candidates.length; index += 1) {
@@ -187,7 +187,11 @@ async function launchSession({ request, headless = false, onEvent }) {
 }
 
 
-async function preflightIRCTCAccess({ request, onEvent } = {}) {
+function preflightHeadless() {
+  return String(process.env.SIVA_PREFLIGHT_HEADLESS || '').toLowerCase() === 'true'
+}
+
+async function preflightIRCTCAccess({ request, onEvent, headless = preflightHeadless() } = {}) {
   const requestedBrowser = configuredBrowser(request || {})
   const candidates = resolveBrowserCandidates(requestedBrowser)
   const failures = []
@@ -203,7 +207,7 @@ async function preflightIRCTCAccess({ request, onEvent } = {}) {
     try {
       browserInstance = await chromium.launch({
         ...browserConfig(browser),
-        headless: true,
+        headless,
       })
 
       const page = await browserInstance.newPage()
@@ -223,6 +227,7 @@ async function preflightIRCTCAccess({ request, onEvent } = {}) {
           status,
           browser,
           url: page.url(),
+          headless,
           reason: 'IRCTC entry was denied by the upstream CDN/WAF from the local execution network.',
         }
         onEvent?.({ type: 'LOG', message: '[PREFLIGHT] BLOCKED: ' + result.reason, metadata: result })
@@ -236,6 +241,7 @@ async function preflightIRCTCAccess({ request, onEvent } = {}) {
           status,
           browser,
           url: page.url(),
+          headless,
         }
         onEvent?.({ type: 'LOG', message: '[PREFLIGHT] IRCTC entry reachable from local worker.', metadata: result })
         return result
@@ -279,6 +285,7 @@ module.exports = {
   browserConfig,
   configuredBrowser,
   isMissingBrowserExecutable,
+  preflightHeadless,
   preflightIRCTCAccess,
   launchSession,
   closeSession,
