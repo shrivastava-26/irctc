@@ -67,3 +67,26 @@ test('local worker cannot steal an expired job owned by another worker', () => {
   assert.equal(second, null)
   cleanup()
 })
+
+
+test('local worker keeps account affinity when an account is pinned', () => {
+  cleanup()
+
+  const job = new Job({
+    executionTarget: 'LOCAL',
+    credentialsReference: 'primary',
+    scheduledAt: null,
+  })
+  JobStore.save(job)
+
+  const claimed = JobStore.claimNextAvailable({
+    executionTarget: 'LOCAL',
+    workerId: 'worker-a',
+    accountReference: 'secondary',
+    leaseMs: 1000,
+  })
+
+  assert.equal(claimed, null)
+  assert.equal(JobStore.findById(job.id).status, 'STARTING')
+  cleanup()
+})
