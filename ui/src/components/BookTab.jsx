@@ -14,6 +14,7 @@ export default function BookTab({
   journeys,
   onStart,
   activeJobsCount,
+  localWorkerOnline = false,
   selectedJourneyIds = [],
   onSelectionChange,
   onOpenDialog,

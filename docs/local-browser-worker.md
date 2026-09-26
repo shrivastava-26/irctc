@@ -12,6 +12,8 @@ Add a random high-entropy value as the Render environment variable:
 
 Do not commit the token.
 
+For reliable queued-job persistence across Render restarts/redeploys, also set `SIVA_DATA_DIR` to a directory backed by persistent storage. Render Free web services cannot attach persistent disks, so without a persistent datastore/disk the control-plane job file can be lost on restart. Render documents that Free services have an ephemeral filesystem. A paid service can attach a persistent disk; alternatively migrate `JobStore` to Render Postgres/Key Value when needed.
+
 The web app can continue to run on Render. Jobs created by the UI use `executionTarget: LOCAL`, so the hosted scheduler does not launch a browser for them.
 
 ## 2. Local machine
@@ -40,6 +42,8 @@ For multiple accounts, use `SIVA_WORKER_CREDENTIALS_FILE` instead:
 ```
 
 Keep that file outside Git and restrict access to your user account.
+
+The Book screen shows **LOCAL BROWSER · ONLINE/OFFLINE**. The worker publishes a presence heartbeat, and the UI will refuse to create a local automation job while no worker is online.
 
 Optional tuning:
 
@@ -73,3 +77,14 @@ If the local worker disappears before the transactional boundary, the same worke
 A job owned by a different worker is never automatically stolen. This avoids silently duplicating a transaction after an uncertain worker failure.
 
 No live booking is implied by CI. A real booking remains dependent on the local machine, local Playwright profile/session, current IRCTC availability, and a user-network authenticated run.
+
+
+## Control-plane persistence
+
+The job store honors `SIVA_DATA_DIR`. If you attach a Render persistent disk, point this variable at the disk mount path, for example:
+
+```text
+SIVA_DATA_DIR=/var/data/siva
+```
+
+This preserves the job queue and control-plane state across service restarts. The local worker keeps its own Playwright profiles and booking run state on the execution machine.
