@@ -139,42 +139,60 @@ class IRCTCAdapter {
     throw new Error('Could not determine IRCTC runtime surface. URL=' + this.page.url())
   }
 
-  async detectPreSearchSurface() {
-    // The entry URL is the most stable signal before the journey form is
-    // rendered. IRCTC can change Angular/ARIA markup without changing the
-    // surface route, so do not require one exact DOM selector here.
-    const url = this.page.url()
-    if (/\/nget(?:\/|$)/i.test(url)) {
-      this.runtimeSurface = SURFACES.LEGACY
-      return this.runtimeSurface
-    }
-    if (/\/eticket(?:\/|$)/i.test(url)) {
-      this.runtimeSurface = SURFACES.NEW
-      return this.runtimeSurface
-    }
+  async detectPreSearchSurface(options = {}) {
+    const configuredTimeout = Number(options.timeoutMs)
+    const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : Number(process.env.IRCTC_PRESEARCH_DETECTION_TIMEOUT_MS) || 15000
 
-    if (await this.page.locator('#origin').isVisible().catch(() => false)) {
-      this.runtimeSurface = SURFACES.LEGACY
-      return this.runtimeSurface
-    }
+    const startedAt = Date.now()
+    let lastDiagnostics = null
 
-    const newSurfaceSignals = [
-      this.page.getByRole('combobox', { name: /from station/i }).first(),
-      this.page.locator('input[formcontrolname="origin"]:visible').first(),
-      this.page.locator('input[name*="origin" i]:visible').first(),
-      this.page.locator('input[placeholder*="from" i]:visible').first(),
-    ]
+    while (Date.now() - startedAt < timeoutMs) {
+      const url = this.page.url()
+      const routeSurface = detectRuntimeSurfaceFromUrl(url)
+      const title = await this.page.title().catch(() => '')
+      const body = (await this.bodyText()).replace(/\s+/g, ' ').trim()
+      const blocked = /(?:\b403\b|forbidden|access denied|service unavailable|bad gateway|gateway timeout)/i.test(body)
 
-    for (const signal of newSurfaceSignals) {
-      if (await signal.isVisible().catch(() => false)) {
-        this.runtimeSurface = SURFACES.NEW
+      lastDiagnostics = {
+        url,
+        title,
+        routeSurface,
+        blocked,
+      }
+
+      if (routeSurface !== SURFACES.UNKNOWN && !blocked) {
+        this.runtimeSurface = routeSurface
         return this.runtimeSurface
       }
+
+      if (await this.page.locator('#origin').isVisible().catch(() => false)) {
+        this.runtimeSurface = SURFACES.LEGACY
+        return this.runtimeSurface
+      }
+
+      const newSurfaceSignals = [
+        this.page.getByRole('combobox', { name: /from station/i }).first(),
+        this.page.locator('input[formcontrolname="origin"]:visible').first(),
+        this.page.locator('input[name*="origin" i]:visible').first(),
+        this.page.locator('input[placeholder*="from" i]:visible').first(),
+        this.page.locator('app-jp-input:visible').first(),
+      ]
+
+      for (const signal of newSurfaceSignals) {
+        if (await signal.isVisible().catch(() => false)) {
+          this.runtimeSurface = SURFACES.NEW
+          return this.runtimeSurface
+        }
+      }
+
+      await this.page.waitForTimeout(250)
     }
 
+    this.emitLog('[SURFACE] Pre-search detection timed out.', lastDiagnostics)
     return SURFACES.UNKNOWN
   }
-
   trainContainers() {
     return this.runtimeSurface === SURFACES.NEW
       ? this.page.locator('div.train-result-container')
