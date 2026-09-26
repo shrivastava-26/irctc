@@ -156,6 +156,60 @@ function availabilityStatus(value) {
   return 'UNKNOWN'
 }
 
+function continuePaymentFlow(request) {
+  return cy.get('body', { timeout: 30000 }).then(($body) => {
+    const method = String(request.paymentPreference?.method || 'UPI').toUpperCase()
+    const body = textOf($body)
+
+    if (method === 'EWALLET' && /e-?wallet/i.test(body)) {
+      return cy.contains(
+        'button, [role="button"], label, div',
+        /e-?wallet/i,
+        { timeout: 10000 },
+      )
+        .filter(':visible')
+        .first()
+        .click()
+    }
+
+    if (/UPI/i.test(method) && /upi/i.test(body)) {
+      return cy.contains(
+        'button, [role="button"], label, div',
+        /^UPI$/i,
+        { timeout: 10000 },
+      )
+        .filter(':visible')
+        .first()
+        .click()
+        .then(() => {
+          if (!request.paymentPreference?.upiId) return
+
+          return cy.get(
+            'input[placeholder*="UPI" i], input[name*="upi" i], input[id*="upi" i]',
+            { timeout: 10000 },
+          )
+            .filter(':visible')
+            .first()
+            .clear()
+            .type(String(request.paymentPreference.upiId), { log: false })
+            .then(() =>
+              cy.contains(
+                'button, [role="button"]',
+                /verify|proceed|pay/i,
+                { timeout: 10000 },
+              )
+                .filter(':visible')
+                .first()
+                .should('be.enabled')
+                .click(),
+            )
+        })
+    }
+
+    return null
+  })
+}
+
 describe('IRCTC — Autonomous Booking Engine', () => {
   let request = null
   let persisted = null
@@ -673,6 +727,8 @@ describe('IRCTC — Autonomous Booking Engine', () => {
           .should('be.enabled')
           .click()
       })
+
+      continuePaymentFlow(request)
 
       completeState(
         'VERIFY_TRANSACTION',
