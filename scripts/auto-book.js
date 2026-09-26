@@ -48,6 +48,11 @@ function runCypress(request) {
       process.env.FAST_MODE || (request.fastMode === false ? 'false' : 'true'),
     CYPRESS_DEBUG_MODE:
       process.env.DEBUG_MODE || (request.debugMode ? 'true' : 'false'),
+    CYPRESS_IRCTC_ENTRY_URL:
+      process.env.IRCTC_ENTRY_URL ||
+      (request.entrySurface === 'LEGACY'
+        ? 'https://www.irctc.co.in/nget/train-search'
+        : 'https://www.irctc.co.in/eticket/'),
   }
 
   const browser = process.env.CYPRESS_BROWSER || request.browser || 'edge'
