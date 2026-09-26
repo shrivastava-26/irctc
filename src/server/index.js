@@ -32,6 +32,8 @@ function toPublicJob(job) {
       destination: req.destination,
       travelDate: req.travelDate,
       quota: req.quota,
+      entrySurface: req.entrySurface || 'AUTO',
+      trainSelectionPolicy: req.trainSelectionPolicy || 'FIRST_VALID',
       trainNumber: req.trainNumber,
       coach: req.coach,
       boardingStation: req.boardingStation || null,
@@ -39,6 +41,7 @@ function toPublicJob(job) {
       scheduledAt: req.scheduledAt || null,
       isMock: Boolean(req.isMock),
       browser: req.browser || null,
+      availabilityRequirement: req.availabilityRequirement || 'AVAILABLE',
       passengerCount: Array.isArray(req.passengers) ? req.passengers.length : 0,
       paymentMethod: req.paymentPreference && req.paymentPreference.method
         ? req.paymentPreference.method
