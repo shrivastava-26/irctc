@@ -159,4 +159,34 @@ Train selection uses bounded read-only probes inside the current search-results 
 - SIVA_MIN_AVAILABLE_MEMORY_MB: minimum available memory before admitting another journey. Default: 64 MB on Render, 1024 MB elsewhere.
 
 For a 2 OCPU / 12 GB Oracle Always Free executor, start with SIVA_MAX_CONCURRENT_JOURNEYS=2 and SIVA_MAX_AVAILABILITY_PROBES=2, then tune using telemetry rather than assuming more browser processes are faster.
-\n## Local browser worker\n\nRender is the control plane; live IRCTC browser execution runs on a user-controlled machine.\n\nOne-time setup on the machine that will run Chromium:\n\n    npm install\n    npm run setup:local-worker\n\nThe setup wizard writes `.env.local-worker` locally and it is ignored by git. It asks for the Render control-plane URL, the `SIVA_WORKER_TOKEN`, and the IRCTC account credentials. The worker loads that file automatically.\n\nStart the worker:\n\n    npm run start:local-worker\n\nKeep that process running while automation is expected. The Book tab polls `/api/worker/status`; once the worker heartbeat is received, `Start automation` becomes available.\n\nThe worker token is intentionally not stored in the browser or repository. Get the configured token from the Render service environment. Do not commit `.env.local-worker` or paste real credentials into source control.\n\nThe local worker is required for live browser jobs. Render-hosted browser execution remains disabled by design.\n
+
+## Local browser worker
+
+Render is the control plane; live IRCTC browser execution runs on a user-controlled machine.
+
+One-time setup on the machine that will run Chromium:
+
+    npm install
+    npm run setup:local-worker
+
+The setup wizard writes `.env.local-worker` locally and it is ignored by git. It asks for the Render control-plane URL, the `SIVA_WORKER_TOKEN`, and the IRCTC account credentials. The worker loads that file automatically.
+
+Start the worker:
+
+    npm run start:local-worker
+
+Keep that process running while automation is expected. The Book tab polls `/api/worker/status`; once the worker heartbeat is received, `Start automation` becomes available.
+
+The worker token is intentionally not stored in the browser or repository. Get the configured token from the Render service environment. Do not commit `.env.local-worker` or paste real credentials into source control.
+
+The local worker is required for live browser jobs. Render-hosted browser execution remains disabled by design.
+
+### Local access diagnostic
+
+Run a local IRCTC network/access diagnostic (no credentials, no booking):
+
+    npm run diagnose:irctc
+
+By default this uses a headed browser because the live worker also executes headed. Set `SIVA_PREFLIGHT_HEADLESS=true` only when the machine has no GUI.
+
+Live worker preflight is optional and non-blocking by default. Only set both `SIVA_PREFLIGHT=true` and `SIVA_ENFORCE_PREFLIGHT=true` when you explicitly want the diagnostic to gate execution.
