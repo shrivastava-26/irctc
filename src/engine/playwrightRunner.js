@@ -274,7 +274,7 @@ async function runBooking(job, credentials, onEvent) {
         ? [SURFACES.LEGACY]
         : requestedEntry === SURFACES.NEW
           ? [SURFACES.NEW]
-          : [SURFACES.NEW, SURFACES.LEGACY]
+          : [SURFACES.LEGACY, SURFACES.NEW]
 
     await step(
       'RESTORE_SESSION',
@@ -297,9 +297,22 @@ async function runBooking(job, credentials, onEvent) {
 
           try {
             await candidate.openEntrySurface()
+
+            const entryProblem = await candidate.detectEntryAccessProblem()
+            if (entryProblem.blocked) {
+              throw new Error(
+                entryProblem.reason +
+                ' The browser reached IRCTC, but the execution network was denied before the journey form rendered.'
+              )
+            }
+
             const visibleSurface = await candidate.detectPreSearchSurface()
             if (visibleSurface === SURFACES.UNKNOWN) {
-              throw new Error('Entry page opened but the journey form surface could not be detected.')
+              throw new Error(
+                'IRCTC entry page loaded, but no journey form surface was detected. ' +
+                'URL=' + session.page.url() +
+                '. The site may still be rendering or the route may have changed.'
+              )
             }
 
             adapter = visibleSurface === SURFACES.NEW || visibleSurface === SURFACES.LEGACY

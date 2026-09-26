@@ -136,9 +136,60 @@ class IRCTCAdapter {
     throw new Error('Could not determine IRCTC runtime surface. URL=' + this.page.url())
   }
 
+  async detectEntryAccessProblem() {
+    const body = (await this.bodyText()).replace(/\s+/g, ' ').trim()
+    if (/access denied|you don't have permission to access|errors\.edgesuite\.net|reference\s*#\d+/i.test(body)) {
+      return {
+        blocked: true,
+        reason: 'IRCTC entry page was denied by the upstream CDN/WAF.',
+      }
+    }
+    return { blocked: false, reason: null }
+  }
+
   async detectPreSearchSurface() {
-    if (await this.page.locator('#origin').isVisible().catch(() => false)) return SURFACES.LEGACY
-    if (await this.page.getByRole('combobox', { name: 'From station' }).isVisible().catch(() => false)) return SURFACES.NEW
+    const blocked = await this.detectEntryAccessProblem()
+    if (blocked.blocked) {
+      throw new Error(
+        blocked.reason +
+        ' The browser reached IRCTC, but the execution network was denied before the journey form rendered.'
+      )
+    }
+
+    const url = this.page.url()
+    if (/\/nget(?:\/|$)/i.test(url)) {
+      this.runtimeSurface = SURFACES.LEGACY
+      return this.runtimeSurface
+    }
+    if (/\/eticket(?:\/|$)/i.test(url)) {
+      this.runtimeSurface = SURFACES.NEW
+      return this.runtimeSurface
+    }
+
+    const legacySignals = [
+      this.page.locator('#origin:visible').first(),
+      this.page.locator('input[formcontrolname="origin"]:visible').first(),
+      this.page.locator('input[name*="origin" i]:visible').first(),
+    ]
+    for (const signal of legacySignals) {
+      if (await signal.isVisible().catch(() => false)) {
+        this.runtimeSurface = SURFACES.LEGACY
+        return this.runtimeSurface
+      }
+    }
+
+    const newSignals = [
+      this.page.getByRole('combobox', { name: /from station/i }).first(),
+      this.page.locator('input[placeholder*="from" i]:visible').first(),
+      this.page.locator('input[aria-label*="from" i]:visible').first(),
+    ]
+    for (const signal of newSignals) {
+      if (await signal.isVisible().catch(() => false)) {
+        this.runtimeSurface = SURFACES.NEW
+        return this.runtimeSurface
+      }
+    }
+
     return SURFACES.UNKNOWN
   }
 

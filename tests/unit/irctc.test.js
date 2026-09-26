@@ -69,3 +69,39 @@ test('booking request supports Auto surface and FIRST_VALID without a train numb
   assert.equal(normalized.trainSelectionPolicy, 'FIRST_VALID')
   assert.equal(normalized.trainNumber, null)
 })
+test('entry route detection is URL-first and independent of exact ARIA names', async () => {
+  const { IRCTCAdapter } = require('../../src/engine/irctc/IRCTCAdapter')
+
+  const makePage = url => ({
+    url: () => url,
+    locator: () => ({
+      innerText: async () => '',
+      isVisible: async () => false,
+      first() { return this },
+    }),
+    getByRole: () => ({
+      isVisible: async () => false,
+      first() { return this },
+    }),
+  })
+
+  const legacy = new IRCTCAdapter({ page: makePage('https://www.irctc.co.in/nget/train-search'), context: {}, request: {}, credentials: {} })
+  assert.equal(await legacy.detectPreSearchSurface(), 'LEGACY')
+
+  const modern = new IRCTCAdapter({ page: makePage('https://www.irctc.co.in/eticket/'), context: {}, request: {}, credentials: {} })
+  assert.equal(await modern.detectPreSearchSurface(), 'NEW')
+})
+
+test('access-denied pages are classified separately from missing-form pages', async () => {
+  const { IRCTCAdapter } = require('../../src/engine/irctc/IRCTCAdapter')
+  const page = {
+    url: () => 'https://www.irctc.co.in/nget/train-search',
+    locator: () => ({
+      innerText: async () => "Access Denied You don't have permission to access this server Reference #18.123",
+    }),
+  }
+  const adapter = new IRCTCAdapter({ page, context: {}, request: {}, credentials: {} })
+  const problem = await adapter.detectEntryAccessProblem()
+  assert.equal(problem.blocked, true)
+})
+

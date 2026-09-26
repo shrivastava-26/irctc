@@ -3,7 +3,8 @@ const { classPattern, parseTrainNumber, normalizeAvailability, parseTravelDate, 
 
 class LegacyIRCTCAdapter extends IRCTCAdapter {
   async openEntrySurface() {
-    await this.page.goto('https://www.irctc.co.in/nget/train-search', { waitUntil: 'domcontentloaded', timeout: 60000 })
+    const response = await this.page.goto('https://www.irctc.co.in/nget/train-search', { waitUntil: 'domcontentloaded', timeout: 60000 })
+    this.entryHttpStatus = response?.status?.() || null
     await this.page.locator('body').waitFor({ state: 'visible', timeout: 60000 })
     await this.ensureEnglish()
   }
