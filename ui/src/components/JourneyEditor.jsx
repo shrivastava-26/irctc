@@ -32,6 +32,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
     : {
         source: '',
         destination: '',
+        entrySurface: 'NEW',
         travelDate: null,
         quota: 'GENERAL',
         trainNumber: '',
@@ -107,6 +108,18 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
                 format="DD/MM/YYYY"
                 slotProps={{ textField: { fullWidth: true, error: !!errors.travelDate } }}
               />
+            )} />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Controller name="entrySurface" control={control} render={({ field }) => (
+              <FormControl fullWidth>
+                <InputLabel>IRCTC Website</InputLabel>
+                <Select {...field} label="IRCTC Website">
+                  <MenuItem value="NEW">New IRCTC — /eticket/</MenuItem>
+                  <MenuItem value="LEGACY">Legacy IRCTC — /nget/train-search</MenuItem>
+                </Select>
+              </FormControl>
             )} />
           </Grid>
 
