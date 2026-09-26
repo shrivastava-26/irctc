@@ -33,36 +33,48 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
   const pollRef = useRef(null)
   const logsEndRef = useRef(null)
 
-  const fetchJobs = async () => {
-    if (!activeJobs || activeJobs.length === 0) return
-
-    try {
-      const results = await Promise.all(
-        activeJobs.map(id => fetch(API + '/jobs/' + id).then(res => res.json()))
-      )
-      setJobsData(results)
-
-      const allDone = results.every(job => job.status === 'COMPLETED' || job.status === 'FAILED')
-      if (allDone && pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
-    } catch {
-      // Ignore transient polling errors.
-    }
-  }
-
   useEffect(() => {
     if (!open || !activeJobs || activeJobs.length === 0) return undefined
 
-    fetchJobs()
-    pollRef.current = setInterval(fetchJobs, 1500)
+    let cancelled = false
+    let timer = null
+
+    const poll = async () => {
+      try {
+        const results = await Promise.allSettled(
+          activeJobs.map(id =>
+            fetch(API + '/jobs/' + id, { cache: 'no-store' }).then(res => {
+              if (!res.ok) throw new Error('Job status unavailable')
+              return res.json()
+            })
+          )
+        )
+
+        if (cancelled) return
+
+        const fulfilled = results
+          .filter(result => result.status === 'fulfilled')
+          .map(result => result.value)
+
+        if (fulfilled.length > 0) {
+          setJobsData(fulfilled)
+          const allDone = fulfilled.every(job => job.status === 'COMPLETED' || job.status === 'FAILED')
+          if (allDone) return
+        }
+      } catch {
+        // Ignore transient polling errors.
+      }
+
+      if (!cancelled) {
+        timer = window.setTimeout(poll, 1200)
+      }
+    }
+
+    poll()
 
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
     }
   }, [activeJobs, open])
 
