@@ -169,6 +169,15 @@ describe('IRCTC — Autonomous Booking Engine', () => {
     return cy.engineLoadState().then((state) => {
       persisted = state || null
       currentState = state?.state || 'BOOT'
+      // A crash during SUBMIT/VERIFY_TRANSACTION makes the transaction outcome
+      // ambiguous. Never replay the submit step blindly on resume.
+      if (
+        state &&
+        (state.state === 'SUBMIT' || state.state === 'VERIFY_TRANSACTION') &&
+        state.phase === 'RUNNING'
+      ) {
+        currentState = 'VERIFY_TRANSACTION'
+      }
       cy.task('log', '[RESUME] persisted state = ' + currentState)
     })
   })
