@@ -68,11 +68,13 @@ module.exports = defineConfig({
             message: message || null,
             metadata: metadata || null,
           })
-          postJobEvent(jobId, {
+          const event = {
             type: 'STATE_CHANGED',
             state: saved.state,
             message: message || null,
-          })
+          }
+          if (metadata && metadata.pnr) event.pnr = String(metadata.pnr)
+          postJobEvent(jobId, event)
           return saved
         },
 
