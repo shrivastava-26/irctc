@@ -135,8 +135,15 @@ app.post('/credentials', async (req, res) => {
 })
 
 if (require.main === module || process.env.RUN_JOB_MANAGER !== 'false') {
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('[Job Manager] Listening on http://0.0.0.0:' + PORT)
+    Scheduler.recoverPendingJobs().catch((error) => {
+      console.error('[Job Manager] Failed to recover pending jobs:', error.message)
+    })
+  })
+
+  server.on('error', (error) => {
+    console.error('[Job Manager] Server error:', error.message)
   })
 }
 
