@@ -56,6 +56,10 @@ async function launchSession({ request, headless = false, onEvent }) {
       acceptDownloads: true,
     })
 
+    if (process.env.PLAYWRIGHT_DEBUG === 'true') {
+      await context.tracing.start({ screenshots: true, snapshots: true, sources: true })
+    }
+
     context.setDefaultTimeout(Number(process.env.PLAYWRIGHT_ACTION_TIMEOUT_MS) || 20000)
     context.setDefaultNavigationTimeout(Number(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS) || 60000)
 
