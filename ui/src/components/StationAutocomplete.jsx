@@ -73,7 +73,13 @@ export default function StationAutocomplete({
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [value])
+  }, [])
+
+  useEffect(() => {
+    const current = stations.find(item => String(item.code).toUpperCase() === String(value || '').toUpperCase())
+    if (current) setInputValue(current.name + ' (' + current.code + ')')
+    else if (!value) setInputValue('')
+  }, [stations, value])
 
   const selected = useMemo(
     () => stations.find(item => String(item.code).toUpperCase() === String(value || '').toUpperCase()) || null,
