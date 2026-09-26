@@ -165,7 +165,6 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
 
   async selectPassengers() {
     const masterSelections = await this.applyMasterPassengerSelections()
-
     const rows = this.page.locator(
       'app-passenger-detail, app-passenger, .passenger-card, .passenger-form, tr.passenger-row',
     )
@@ -174,71 +173,136 @@ class LegacyIRCTCAdapter extends IRCTCAdapter {
       throw new Error('Could not locate scoped passenger containers.')
     }
 
-    for (let i = 0; i < this.request.passengers.length; i += 1) {
-      const passenger = this.request.passengers[i]
-      const row = rows.nth(i)
+    const identities = []
+    const used = new Set()
+    for (let index = 0; index < count; index += 1) {
+      identities.push(await this.readPassengerIdentity(rows.nth(index)))
+    }
 
-      if (masterSelections.has(i) && await this.verifyMasterPassenger(row, passenger, i)) {
-        continue
+    const requestedIdentities = new Set(
+      this.request.passengers.map(passenger => [
+        passenger.name,
+        passenger.age,
+        passenger.gender,
+      ].map(String).join('|').toLowerCase()),
+    )
+
+    for (let requestIndex = 0; requestIndex < this.request.passengers.length; requestIndex += 1) {
+      const passenger = this.request.passengers[requestIndex]
+      let rowIndex = -1
+
+      for (let index = 0; index < count; index += 1) {
+        if (used.has(index)) continue
+        if (!passengerIdentityMatches(identities[index], passenger)) continue
+        rowIndex = index
+        break
       }
 
-      const nameField = [
-        row.getByLabel(/^name$/i).first(),
-        row.locator('input[placeholder*="name" i]').first(),
-        row.locator('input[name*="name" i]').first(),
-      ]
-      const ageField = [
-        row.getByLabel(/^age$/i).first(),
-        row.locator('input[placeholder*="age" i]').first(),
-        row.locator('input[name*="age" i]').first(),
-      ]
-
-      let name = null
-      for (const field of nameField) {
-        if (await field.isVisible().catch(() => false)) { name = field; break }
-      }
-      let age = null
-      for (const field of ageField) {
-        if (await field.isVisible().catch(() => false)) { age = field; break }
+      if (rowIndex >= 0) {
+        used.add(rowIndex)
+        if (masterSelections.has(requestIndex) &&
+            await this.verifyMasterPassenger(rows.nth(rowIndex), passenger, requestIndex)) {
+          continue
+        }
+        if (!masterSelections.has(requestIndex)) continue
+      } else if (masterSelections.has(requestIndex)) {
+        this.emitLog('[MASTER] Passenger ' + (requestIndex + 1) + ' Master selection was not reflected in the form; using local fallback.')
       }
 
-      if (!name || !age) throw new Error('Passenger fields missing for passenger ' + (i + 1))
-      await name.fill(passenger.name)
-      await age.fill(String(passenger.age))
+      rowIndex = -1
+      for (let index = 0; index < count; index += 1) {
+        if (used.has(index)) continue
+        const identity = identities[index]
+        const isEmpty = !String(identity.name || '').trim() &&
+          !String(identity.age || '').trim() &&
+          !String(identity.gender || '').trim()
+        const belongsToAnotherRequestedPassenger = requestedIdentities.has([
+          identity.name,
+          identity.age,
+          identity.gender,
+        ].map(String).join('|').toLowerCase())
 
-      const gender = row.getByLabel(/^gender$/i).first()
-      if (await gender.isVisible().catch(() => false)) {
-        await gender.click()
-        const option = this.page.getByRole('option', {
-          name: new RegExp('^' + escapeRegExp(passenger.gender) + '$', 'i'),
-        }).last()
-        if (await option.isVisible().catch(() => false)) await option.click()
-      }
-
-      if (passenger.berth && !/no preference|any/i.test(passenger.berth)) {
-        const berth = row.getByLabel(/^berth$/i).first()
-        if (await berth.isVisible().catch(() => false)) {
-          await berth.click()
-          const option = this.page.getByRole('option', {
-            name: new RegExp(escapeRegExp(passenger.berth), 'i'),
-          }).last()
-          if (await option.isVisible().catch(() => false)) await option.click()
+        if (isEmpty || !belongsToAnotherRequestedPassenger) {
+          rowIndex = index
+          break
         }
       }
 
-      if (
-        (await name.inputValue()) !== passenger.name ||
-        (await age.inputValue()) !== String(passenger.age)
-      ) {
-        throw new Error('Passenger verification failed for ' + passenger.name)
+      if (rowIndex < 0) {
+        throw new Error('No safe passenger slot available for passenger ' + (requestIndex + 1))
       }
 
+      const row = rows.nth(rowIndex)
+      await this.fillLocalPassengerRow(row, passenger, requestIndex)
+      used.add(rowIndex)
+      identities[rowIndex] = {
+        name: passenger.name,
+        age: passenger.age,
+        gender: passenger.gender,
+      }
       if (this.request.useMasterPassenger) {
-        this.emitLog('[MASTER] Passenger ' + (i + 1) + ' using local passenger data.')
+        this.emitLog('[MASTER] Passenger ' + (requestIndex + 1) + ' using local passenger data.')
       }
     }
   }
 
+  async fillLocalPassengerRow(row, passenger, index) {
+    const findVisible = async candidates => {
+      for (const candidate of candidates) {
+        if (await candidate.isVisible().catch(() => false)) return candidate
+      }
+      return null
+    }
+
+    const nameField = await findVisible([
+      row.getByLabel(/^name$/i).first(),
+      row.locator('input[placeholder*="name" i]').first(),
+      row.locator('input[name*="name" i]').first(),
+    ])
+    const ageField = await findVisible([
+      row.getByLabel(/^age$/i).first(),
+      row.locator('input[placeholder*="age" i]').first(),
+      row.locator('input[name*="age" i]').first(),
+    ])
+
+    if (!nameField || !ageField) {
+      throw new Error('Passenger fields missing for passenger ' + (index + 1))
+    }
+
+    await nameField.fill(passenger.name)
+    await ageField.fill(String(passenger.age))
+
+    const gender = row.getByLabel(/^gender$/i).first()
+    if (await gender.isVisible().catch(() => false)) {
+      await gender.click()
+      const option = this.page.getByRole('option', {
+        name: new RegExp('^' + escapeRegExp(passenger.gender) + '$', 'i'),
+      }).last()
+      if (await option.isVisible().catch(() => false)) await option.click()
+    }
+
+    if (passenger.berth && !/no preference|any/i.test(passenger.berth)) {
+      const berth = row.getByLabel(/^berth$/i).first()
+      if (await berth.isVisible().catch(() => false)) {
+        await berth.click()
+        const option = this.page.getByRole('option', {
+          name: new RegExp(escapeRegExp(passenger.berth), 'i'),
+        }).last()
+        if (await option.isVisible().catch(() => false)) await option.click()
+      }
+    }
+
+    if (
+      (await nameField.inputValue()) !== passenger.name ||
+      (await ageField.inputValue()) !== String(passenger.age)
+    ) {
+      throw new Error('Passenger verification failed for ' + passenger.name)
+    }
+  }
+
+  async submitTransaction() {
+    return super.submitTransaction()
+  }
   async submitTransaction() {
     return super.submitTransaction()
   }

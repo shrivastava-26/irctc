@@ -182,7 +182,6 @@ class NewIRCTCAdapter extends IRCTCAdapter {
 
   async selectPassengers() {
     const masterSelections = await this.applyMasterPassengerSelections()
-
     const containers = this.page.locator(
       'app-passenger-detail, app-passenger, .passenger-card, .passenger-form, tr.passenger-row',
     )
@@ -191,17 +190,75 @@ class NewIRCTCAdapter extends IRCTCAdapter {
       throw new Error('Could not locate scoped passenger containers for every passenger.')
     }
 
-    for (let index = 0; index < this.request.passengers.length; index += 1) {
-      const passenger = this.request.passengers[index]
-      const card = containers.nth(index)
+    const identities = []
+    const used = new Set()
+    for (let index = 0; index < count; index += 1) {
+      identities.push(await this.readPassengerIdentity(containers.nth(index)))
+    }
 
-      if (masterSelections.has(index) && await this.verifyMasterPassenger(card, passenger, index)) {
-        continue
+    const requestedIdentities = new Set(
+      this.request.passengers.map(passenger => [
+        passenger.name,
+        passenger.age,
+        passenger.gender,
+      ].map(String).join('|').toLowerCase()),
+    )
+
+    for (let requestIndex = 0; requestIndex < this.request.passengers.length; requestIndex += 1) {
+      const passenger = this.request.passengers[requestIndex]
+      let containerIndex = -1
+
+      for (let index = 0; index < count; index += 1) {
+        if (used.has(index)) continue
+        if (!passengerIdentityMatches(identities[index], passenger)) continue
+        containerIndex = index
+        break
       }
 
-      await this.fillPassengerCard(card, passenger, index)
+      if (containerIndex >= 0) {
+        used.add(containerIndex)
+        if (masterSelections.has(requestIndex) &&
+            await this.verifyMasterPassenger(containers.nth(containerIndex), passenger, requestIndex)) {
+          continue
+        }
+        if (!masterSelections.has(requestIndex)) continue
+      } else if (masterSelections.has(requestIndex)) {
+        this.emitLog('[MASTER] Passenger ' + (requestIndex + 1) + ' Master selection was not reflected in the form; using local fallback.')
+      }
+
+      containerIndex = -1
+      for (let index = 0; index < count; index += 1) {
+        if (used.has(index)) continue
+        const identity = identities[index]
+        const isEmpty = !String(identity.name || '').trim() &&
+          !String(identity.age || '').trim() &&
+          !String(identity.gender || '').trim()
+        const belongsToAnotherRequestedPassenger = requestedIdentities.has([
+          identity.name,
+          identity.age,
+          identity.gender,
+        ].map(String).join('|').toLowerCase())
+
+        if (isEmpty || !belongsToAnotherRequestedPassenger) {
+          containerIndex = index
+          break
+        }
+      }
+
+      if (containerIndex < 0) {
+        throw new Error('No safe passenger slot available for passenger ' + (requestIndex + 1))
+      }
+
+      const card = containers.nth(containerIndex)
+      await this.fillPassengerCard(card, passenger, requestIndex)
+      used.add(containerIndex)
+      identities[containerIndex] = {
+        name: passenger.name,
+        age: passenger.age,
+        gender: passenger.gender,
+      }
       if (this.request.useMasterPassenger) {
-        this.emitLog('[MASTER] Passenger ' + (index + 1) + ' using local passenger data.')
+        this.emitLog('[MASTER] Passenger ' + (requestIndex + 1) + ' using local passenger data.')
       }
     }
   }
