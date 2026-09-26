@@ -179,7 +179,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
                 placeholder="5-digit train number"
                 inputProps={{ maxLength: 5, inputMode: 'numeric' }}
                 onChange={(event) => {
-                  const value = event.target.value.replace(/\\D/g, '').slice(0, 5)
+                  const value = event.target.value.replace(/\D/g, '').slice(0, 5)
                   field.onChange(value)
                   setValue('trainSelectionPolicy', value ? 'FIXED' : 'FIRST_VALID')
                 }}
@@ -195,7 +195,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
                 fullWidth
                 placeholder="5-digit train number"
                 onChange={(event) => {
-                  const value = event.target.value.replace(/\\D/g, '').slice(0, 5)
+                  const value = event.target.value.replace(/\D/g, '').slice(0, 5)
                   field.onChange(value)
                   setValue('trainNumber', value)
                   setValue('trainSelectionPolicy', value ? 'FIXED' : 'FIRST_VALID')
