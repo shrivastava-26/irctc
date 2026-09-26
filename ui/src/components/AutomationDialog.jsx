@@ -104,13 +104,7 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
         <Stack direction="row" alignItems="center" spacing={1}>
           {activeJob?.status === 'RUNNING' || activeJob?.status === 'STARTING'
             ? <CircularProgress size={18} thickness={4} />
-          {activeJob?.status === 'STARTING'
-            ? 'Waiting for local browser'
-            : activeJob?.status === 'RUNNING'
-              ? 'Automation running'
-              : activeJob?.status === 'COMPLETED'
-                ? 'Automation completed'
-                : 'Automation failed'}
+            : activeJob?.status === 'COMPLETED'
               ? <CheckCircleIcon color="success" />
               : <ErrorIcon color="error" />}
           <Box minWidth={0}>
