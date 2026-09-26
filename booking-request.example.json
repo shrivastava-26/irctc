@@ -19,7 +19,7 @@
   ],
   "paymentPreference": {
     "method": "UPI",
-    "upiId": ""
+    "upiId": "YOUR_UPI_ID"
   },
   "executionMode": "NOW",
   "fastMode": true,
