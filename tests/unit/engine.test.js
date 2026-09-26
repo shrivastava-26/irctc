@@ -67,8 +67,8 @@ test('booking request supports both IRCTC entry surfaces', () => {
   assert.deepEqual(validate({ ...base, entrySurface: 'NEW' }), [])
   assert.deepEqual(validate({ ...base, entrySurface: 'LEGACY' }), [])
   assert.equal(normalize({ ...base, entrySurface: 'LEGACY' }).entrySurface, 'LEGACY')
-  assert.throws(
-    () => validate({ ...base, entrySurface: 'OTHER' }),
+  assert.match(
+    validate({ ...base, entrySurface: 'OTHER' }).join(' '),
     /entrySurface must be NEW or LEGACY/,
   )
 })
