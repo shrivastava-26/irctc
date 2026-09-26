@@ -1,5 +1,5 @@
 {
-  "name": "irctc-booking-automation",
+  "name": "irctc-cypress-automation",
   "version": "3.0.5",
   "description": "IRCTC Ticket Booking Automation with Playwright production runner and Cypress legacy compatibility",
   "scripts": {
