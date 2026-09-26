@@ -480,6 +480,21 @@ class IRCTCAdapter {
     return String(this.request.paymentPreference?.method || 'UPI').toUpperCase()
   }
 
+  async clickPaymentContinueIfVisible() {
+    const candidates = [
+      this.page.getByRole('button', { name: /^Continue$/i }).first(),
+      this.page.getByText(/^Continue$/i).first(),
+    ]
+
+    for (const candidate of candidates) {
+      if (await candidate.isVisible().catch(() => false) && await candidate.isEnabled().catch(() => false)) {
+        await candidate.click()
+        return true
+      }
+    }
+    return false
+  }
+
   async selectPaymentMethod() {
     const method = this.paymentMethod()
     this.emitLog('[PAYMENT] Payment method: ' + method + '.')
@@ -499,18 +514,26 @@ class IRCTCAdapter {
 
       for (const candidate of direct) {
         if (await candidate.isVisible().catch(() => false)) {
-          await candidate.click().catch(() => {})
+          await candidate.click()
+          await this.clickPaymentContinueIfVisible()
           return
         }
       }
 
       const gateway = this.page.getByText(outerGatewayText).last()
       if (await gateway.isVisible().catch(() => false)) {
-        await gateway.click().catch(() => {})
+        await gateway.click()
+        await this.clickPaymentContinueIfVisible()
         const upi = this.page.getByText(/pay through bhim.*upi/i).first()
-        if (await upi.isVisible().catch(() => false)) await upi.click().catch(() => {})
+        if (await upi.isVisible().catch(() => false)) {
+          await upi.click()
+          await this.clickPaymentContinueIfVisible()
+          return
+        }
       }
-      return
+
+      // Keep UPI strict: never silently switch to another payment method.
+      throw new Error('Selected payment method unavailable: UPI.')
     }
 
     const direct = [
@@ -530,10 +553,13 @@ class IRCTCAdapter {
 
     if (!selected) {
       const gateway = this.page.getByText(outerGatewayText).last()
-      if (await gateway.isVisible().catch(() => false)) await gateway.click().catch(() => {})
+      if (await gateway.isVisible().catch(() => false)) {
+        await gateway.click()
+        await this.clickPaymentContinueIfVisible()
+      }
       for (const candidate of direct) {
         if (await candidate.isVisible().catch(() => false)) {
-          await candidate.click().catch(() => {})
+          await candidate.click()
           selected = true
           break
         }
@@ -541,6 +567,7 @@ class IRCTCAdapter {
     }
 
     if (!selected) throw new Error('Selected payment method unavailable: IRCTC eWallet.')
+    await this.clickPaymentContinueIfVisible()
     this.emitLog('[PAYMENT] eWallet selected.')
   }
 

@@ -70,7 +70,7 @@ test('booking request supports Auto surface and FIRST_VALID without a train numb
   assert.equal(normalized.trainNumber, null)
 })
 
-const { selectedTrainEntries, orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
+const { selectedTrainEntries: explicitSelectedTrainEntries, orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
 const { normalizePassengerValue, passengerIdentityMatches, findMasterPassenger } = require('../../src/engine/irctc/masterPassenger')
 
 test('explicit selected trains are validated, normalized by priority, and exclude unchecked candidates', () => {
@@ -96,7 +96,7 @@ test('explicit selected trains are validated, normalized by priority, and exclud
     normalized.selectedTrains.map(item => [item.trainNumber, item.priority, item.selected]),
     [['12951', 1, true], ['12301', 2, true], ['12424', 3, false]],
   )
-  assert.deepEqual(selectedTrainEntries(normalized).map(item => item.trainNumber), ['12951', '12301'])
+  assert.deepEqual(explicitSelectedTrainEntries(normalized).map(item => item.trainNumber), ['12951', '12301'])
   assert.deepEqual(orderedTrainNumbers(normalized, [{ trainNumber: '12424' }]), ['12951', '12301'])
 })
 
