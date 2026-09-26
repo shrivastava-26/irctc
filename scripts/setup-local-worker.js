@@ -53,10 +53,10 @@ async function main() {
   ].join('\n')
 
   fs.writeFileSync(OUTPUT, env, { mode: 0o600 })
-  console.log('\\nCreated ' + OUTPUT)
+  console.log('\nCreated ' + OUTPUT)
   console.log('Start the worker with:')
   console.log('  npm run start:local-worker')
-  console.log('\\nThe worker automatically loads .env.local-worker and must remain running on the machine that owns the IRCTC browser session.')
+  console.log('\nThe worker automatically loads .env.local-worker and must remain running on the machine that owns the IRCTC browser session.')
 }
 
 main()
