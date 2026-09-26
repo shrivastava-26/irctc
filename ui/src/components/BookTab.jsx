@@ -6,6 +6,7 @@ import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined'
 import TrainOutlinedIcon from '@mui/icons-material/TrainOutlined'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import QueuePlayNextOutlinedIcon from '@mui/icons-material/QueuePlayNextOutlined'
+import LaptopMacOutlinedIcon from '@mui/icons-material/LaptopMacOutlined'
 import { NeoButton, StatusBadge } from './RailxPrimitives'
 
 export default function BookTab({
@@ -56,6 +57,10 @@ export default function BookTab({
         </Stack>
 
         <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
+          <span className="railx-summary-pill">
+            <LaptopMacOutlinedIcon sx={{ fontSize: 14 }} />
+            Local browser
+          </span>
           <span className="railx-summary-pill">
             <QueuePlayNextOutlinedIcon sx={{ fontSize: 14 }} />
             {activeJobsCount} active
