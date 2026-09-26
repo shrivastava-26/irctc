@@ -88,6 +88,25 @@ async function claimOne() {
   return body.job || null
 }
 
+async function workerHeartbeatLoop(stopSignal) {
+  while (!stopSignal.stopped) {
+    try {
+      await requestJson('/worker/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify({
+          workerId: WORKER_ID,
+          accountReference: localWorkerAccount(),
+          concurrency: CONCURRENCY,
+          activeJobs: running.size,
+        }),
+      })
+    } catch (error) {
+      console.error('[LOCAL-WORKER] Presence heartbeat failed: ' + error.message)
+    }
+    await sleep(Math.min(HEARTBEAT_MS, 10000))
+  }
+}
+
 async function heartbeatLoop(jobId, stopSignal) {
   while (!stopSignal.stopped) {
     await sleep(HEARTBEAT_MS)
@@ -200,6 +219,9 @@ async function main() {
   console.log('[LOCAL-WORKER] Worker ID: ' + WORKER_ID)
   console.log('[LOCAL-WORKER] Account: ' + (localWorkerAccount() || 'credential map'))
   console.log('[LOCAL-WORKER] Concurrency: ' + CONCURRENCY)
+
+  const presenceSignal = { stopped: false }
+  const presence = workerHeartbeatLoop(presenceSignal)
 
   while (!stopping) {
     await fillSlots()
