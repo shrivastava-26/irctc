@@ -2,7 +2,7 @@
 
 const VALID_QUOTAS = ['GENERAL', 'TATKAL', 'PREMIUM_TATKAL']
 const VALID_EXECUTION_MODES = ['NOW', 'SCHEDULED']
-const VALID_PAYMENT_METHODS = ['UPI']
+const VALID_PAYMENT_METHODS = ['UPI', 'EWALLET']
 const VALID_GENDERS = ['Male', 'Female', 'Transgender']
 const VALID_AVAILABILITY = ['AVAILABLE', 'RAC', 'WL', 'ANY']
 const VALID_TRAIN_SELECTION = ['FIXED', 'FIRST_VALID']
@@ -59,7 +59,7 @@ function validate(data) {
     }
     if (
       data.paymentPreference.method === 'UPI' &&
-      data.paymentPreference.upiId == null
+      !data.paymentPreference.upiId
     ) {
       errors.push('paymentPreference.upiId is required for UPI payment')
     }
