@@ -17,6 +17,24 @@ function safe(value) {
   return String(value || 'default').replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
+function normalizeBrowser(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized || normalized === 'default') return DEFAULT_BROWSER
+  if (normalized === 'system' || normalized === 'auto') return 'auto'
+  if (normalized === 'msedge') return 'edge'
+  if (normalized === 'chrome-stable') return 'chrome'
+  if (['chromium', 'chrome', 'edge'].includes(normalized)) return normalized
+  throw new Error('Unsupported Playwright browser: ' + value + '. Use auto, chromium, chrome, or edge.')
+}
+
+function resolveBrowserCandidates(requested) {
+  const browser = normalizeBrowser(requested)
+  if (browser === 'auto') return ['chrome', 'edge', 'chromium']
+  if (browser === 'chromium') return ['chromium']
+  return [browser, 'chromium']
+}
+
+
 function profileDir(request, browser) {
   return path.join(
     PROFILE_ROOT,
@@ -26,15 +44,15 @@ function profileDir(request, browser) {
 }
 
 function browserConfig(browser) {
-  const value = String(browser || DEFAULT_BROWSER).toLowerCase()
+  const value = normalizeBrowser(browser)
   if (value === 'chrome') return { channel: 'chrome' }
-  if (value === 'edge' || value === 'msedge') return { channel: 'msedge' }
+  if (value === 'edge') return { channel: 'msedge' }
   if (value === 'chromium') return {}
-  throw new Error('Unsupported Playwright browser: ' + value + '. Use chromium, chrome, or edge.')
+  throw new Error('Browser config requires a concrete browser, got: ' + browser)
 }
 
 function configuredBrowser(request) {
-  return String(request.browser || process.env.PLAYWRIGHT_BROWSER || DEFAULT_BROWSER).toLowerCase()
+  return normalizeBrowser(request.browser || process.env.PLAYWRIGHT_BROWSER || DEFAULT_BROWSER)
 }
 
 function isMissingBrowserExecutable(error) {
@@ -60,18 +78,21 @@ async function launchSession({ request, headless = false, onEvent }) {
   fs.mkdirSync(PROFILE_ROOT, { recursive: true })
 
   const requestedBrowser = configuredBrowser(request)
-  const candidates = requestedBrowser === 'chromium'
-    ? ['chromium']
-    : [requestedBrowser, 'chromium']
+  const candidates = resolveBrowserCandidates(requestedBrowser)
+  const failures = []
 
-  let lastError = null
+  onEvent?.({
+    type: 'LOG',
+    message: '[BROWSER] requested=' + requestedBrowser + '; candidates=' + candidates.join(','),
+    metadata: { requestedBrowser, candidates },
+  })
 
-  for (const browser of candidates) {
+  for (let index = 0; index < candidates.length; index += 1) {
+    const browser = candidates[index]
     const dir = profileDir(request, browser)
     fs.mkdirSync(dir, { recursive: true })
 
-    const lockKey = dir
-    const release = await acquireProfileLock(lockKey)
+    const release = await acquireProfileLock(dir)
     let context = null
 
     try {
@@ -81,14 +102,6 @@ async function launchSession({ request, headless = false, onEvent }) {
         viewport: { width: 1440, height: 1000 },
         acceptDownloads: true,
       })
-
-      if (browser !== requestedBrowser) {
-        onEvent?.({
-          type: 'LOG',
-          message: '[BROWSER] ' + requestedBrowser +
-            ' is unavailable; falling back to bundled Chromium.',
-        })
-      }
 
       if (process.env.PLAYWRIGHT_DEBUG === 'true') {
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true })
@@ -116,29 +129,61 @@ async function launchSession({ request, headless = false, onEvent }) {
         }
       })
 
+      const userAgent = await page.evaluate(() => navigator.userAgent).catch(() => null)
+      onEvent?.({
+        type: 'LOG',
+        message: '[BROWSER] selected=' + browser,
+        metadata: {
+          requestedBrowser,
+          actualBrowser: browser,
+          playwrightVersion: require('playwright/package.json').version,
+          userAgent,
+        },
+      })
+
       return {
         context,
         page,
         browser,
+        requestedBrowser,
         userDataDir: dir,
         release,
       }
     } catch (error) {
       if (context) await context.close().catch(() => {})
       release()
-      lastError = error
+      const detail = String(error?.message || error)
+      failures.push(browser + ': ' + detail)
 
       const canFallback =
-        browser === requestedBrowser &&
-        requestedBrowser !== 'chromium' &&
-        isMissingBrowserExecutable(error)
+        index < candidates.length - 1 &&
+        browser !== 'chromium' &&
+        (isMissingBrowserExecutable(error) || requestedBrowser === 'auto')
 
-      if (canFallback) continue
+      if (canFallback) {
+        onEvent?.({
+          type: 'LOG',
+          message: '[BROWSER] ' + browser + ' unavailable; falling back to ' + candidates[index + 1] + '.',
+          metadata: {
+            requestedBrowser,
+            failedBrowser: browser,
+            nextBrowser: candidates[index + 1],
+            reason: detail,
+          },
+        })
+        continue
+      }
+
       throw error
     }
   }
 
-  throw lastError || new Error('No supported Playwright browser could be launched.')
+  throw new Error(
+    'No supported Playwright browser could be launched. Tried ' +
+    candidates.join(' -> ') +
+    '. ' +
+    failures.join(' | '),
+  )
 }
 
 async function closeSession(session) {
@@ -153,6 +198,8 @@ async function closeSession(session) {
 module.exports = {
   PROFILE_ROOT,
   profileDir,
+  normalizeBrowser,
+  resolveBrowserCandidates,
   browserConfig,
   configuredBrowser,
   isMissingBrowserExecutable,
