@@ -12,10 +12,9 @@ function normalizeAccountName(accountName) {
 async function getCredentials(accountName) {
   const envUser = process.env.IRCTC_USERNAME
   const envPass = process.env.IRCTC_PASSWORD
-  const key = normalizeAccountName(accountName)
-  const stored = sessionCredentials.get(key)
 
   if (envUser && envPass) {
+    const stored = sessionCredentials.get(normalizeAccountName(accountName))
     return {
       username: envUser,
       password: envPass,
@@ -23,7 +22,10 @@ async function getCredentials(accountName) {
     }
   }
 
-  if (!stored?.username || !stored?.password) {
+  const key = normalizeAccountName(accountName)
+  const stored = sessionCredentials.get(key)
+
+  if (!stored) {
     throw new Error(
       'No credentials available for this account in the current server session. ' +
       'Save the account again after a server restart.'
@@ -40,9 +42,7 @@ async function setCredentials(accountName, password) {
     throw new Error('accountName and password are required')
   }
 
-  const previous = sessionCredentials.get(key) || {}
   sessionCredentials.set(key, {
-    ...previous,
     username: key,
     password: String(password),
   })

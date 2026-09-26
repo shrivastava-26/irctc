@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import {
   Accordion, AccordionDetails, AccordionSummary, Box, Button, Checkbox, FormControl,
@@ -60,11 +60,6 @@ export default function JourneyEditor({
   accountUsername = '',
   onSecurePaymentCredential,
 }) {
-  const initialSelectedTrains = useMemo(
-    () => legacySelectedTrains(initialData || {}),
-    [initialData],
-  )
-
   const legacyAutomaticMode = Boolean(
     initialData &&
     !Array.isArray(initialData.selectedTrains) &&
@@ -74,29 +69,29 @@ export default function JourneyEditor({
   )
 
   const defaultVals = initialData
-    ? {
-        ...initialData,
+    ? Object.assign({}, initialData, {
         travelDate: initialData.travelDate
           ? dayjs(initialData.travelDate, 'DD/MM/YYYY')
           : null,
-        selectedTrains: initialSelectedTrains,
+        manualTrainNumber: initialData.trainNumber || '',
+        selectedTrains: legacySelectedTrains(initialData),
         useMasterPassenger: Boolean(initialData.useMasterPassenger),
         paymentMethod: initialData.paymentPreference?.method || 'UPI',
         upiId: initialData.paymentPreference?.upiId || initialData.upiId || '',
         ewalletTransactionPassword: '',
-        executionMode: initialData.executionMode || 'NOW',
-      }
+      })
     : {
         source: '',
         destination: '',
         entrySurface: 'AUTO',
         travelDate: null,
         quota: 'GENERAL',
-        selectedTrains: [],
         trainNumber: '',
+        manualTrainNumber: '',
         trainSelectionPolicy: 'FIRST_VALID',
         preferredTrains: [],
         backupTrains: [],
+        selectedTrains: [],
         availabilityRequirement: 'AVAILABLE',
         coach: '3A',
         boardingStation: '',
@@ -123,11 +118,7 @@ export default function JourneyEditor({
     formState: { errors },
   } = useForm({ defaultValues: defaultVals })
 
-  const {
-    fields: passengers,
-    append: appendPassenger,
-    remove: removePassenger,
-  } = useFieldArray({
+  const { fields: passengers, append, remove } = useFieldArray({
     control,
     name: 'passengers',
   })
@@ -149,13 +140,6 @@ export default function JourneyEditor({
   const selectedCount = selectedTrains.filter(item => item?.selected !== false).length
   const paymentMethod = String(watch('paymentMethod') || 'UPI').toUpperCase()
 
-  const swapStations = () => {
-    const from = watch('source')
-    const to = watch('destination')
-    setValue('source', to)
-    setValue('destination', from)
-  }
-
   const addTrain = () => {
     const number = normalizeTrainNumber(newTrainNumber)
     if (!/^\d{5}$/.test(number)) {
@@ -166,13 +150,7 @@ export default function JourneyEditor({
       setSaveError('Train ' + number + ' is already in the list.')
       return
     }
-
-    appendTrain({
-      trainNumber: number,
-      priority: trainFields.length + 1,
-      selected: true,
-      trainName: '',
-    })
+    appendTrain({ trainNumber: number, priority: trainFields.length + 1, selected: true, trainName: '' })
     setNewTrainNumber('')
     setSaveError('')
   }
@@ -181,8 +159,20 @@ export default function JourneyEditor({
     setValue('selectedTrains.' + index + '.selected', checked, { shouldDirty: true })
   }
 
+  const swapStations = () => {
+    const from = watch('source')
+    const to = watch('destination')
+    setValue('source', to)
+    setValue('destination', from)
+  }
+
   const submitHandler = async (data) => {
     setSaveError('')
+
+    const csv = value => {
+      if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
+      return String(value || '').split(',').map(v => v.trim()).filter(Boolean)
+    }
 
     const trains = (data.selectedTrains || []).map((entry, index) => ({
       trainNumber: normalizeTrainNumber(entry?.trainNumber),
@@ -206,48 +196,45 @@ export default function JourneyEditor({
 
     const selected = trains.filter(entry => entry.selected)
     if (!selected.length && !legacyAutomaticMode) {
-      setSaveError('Select at least one train, or use an existing automatic journey.')
+      setSaveError('Select at least one train.')
       return
     }
 
     const method = String(data.paymentMethod || 'UPI').toUpperCase()
-
     if (method === 'UPI' && !String(data.upiId || '').trim()) {
       setSaveError('UPI ID is required for UPI payment.')
       return
     }
 
     if (method === 'EWALLET' && data.ewalletTransactionPassword) {
-      if (!accountUsername.trim()) {
+      if (!String(accountUsername || '').trim()) {
         setSaveError('Select an IRCTC account before storing the eWallet transaction password.')
         return
       }
-
       if (typeof onSecurePaymentCredential !== 'function') {
         setSaveError('Secure eWallet credential storage is unavailable.')
         return
       }
-
       try {
-        await onSecurePaymentCredential(
-          accountUsername.trim(),
-          String(data.ewalletTransactionPassword),
-        )
+        await onSecurePaymentCredential(String(accountUsername).trim(), String(data.ewalletTransactionPassword))
       } catch (error) {
         setSaveError(error.message || 'Could not store the eWallet credential.')
         return
       }
     }
 
-    const payload = {
-      ...data,
+    const payload = Object.assign({}, data, {
       travelDate: data.travelDate ? dayjs(data.travelDate).format('DD/MM/YYYY') : '',
       entrySurface: String(data.entrySurface || 'AUTO').toUpperCase(),
-      trainSelectionPolicy: selected.length ? 'FIRST_VALID' : 'FIRST_VALID',
+      trainSelectionPolicy: selected.length
+        ? 'FIRST_VALID'
+        : String(data.trainSelectionPolicy || 'FIRST_VALID').toUpperCase(),
+      preferredTrains: csv(data.preferredTrains),
+      backupTrains: csv(data.backupTrains),
       selectedTrains: selected.length ? trains : undefined,
-      trainNumber: selected.length === 1 && trains[0].selected ? trains[0].trainNumber : (initialData?.trainNumber || ''),
-      preferredTrains: Array.isArray(data.preferredTrains) ? data.preferredTrains : [],
-      backupTrains: Array.isArray(data.backupTrains) ? data.backupTrains : [],
+      trainNumber: selected.length === 1
+        ? selected[0].trainNumber
+        : (initialData?.trainNumber || ''),
       paymentPreference: {
         method,
         upiId: method === 'UPI' ? String(data.upiId || '').trim() : '',
@@ -259,15 +246,12 @@ export default function JourneyEditor({
         },
       },
       useMasterPassenger: Boolean(data.useMasterPassenger),
-      id: initialData?.id || Date.now().toString(),
-    }
+      id: initialData && initialData.id ? initialData.id : Date.now().toString(),
+    })
 
     delete payload.paymentMethod
     delete payload.ewalletTransactionPassword
-
-    if (!selected.length && legacyAutomaticMode) {
-      delete payload.selectedTrains
-    }
+    if (!selected.length && legacyAutomaticMode) delete payload.selectedTrains
 
     onSave(payload)
   }
@@ -282,7 +266,12 @@ export default function JourneyEditor({
         <Grid container spacing={{ xs: 1.25, sm: 2 }} sx={{ mb: 2 }}>
           <Grid item xs={12} sm={3}>
             <Controller name="source" control={control} rules={{ required: 'Required' }} render={({ field }) => (
-              <StationAutocomplete value={field.value} onChange={field.onChange} label="From" error={errors.source} />
+              <StationAutocomplete
+                value={field.value}
+                onChange={field.onChange}
+                label="From"
+                error={errors.source}
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={1} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'center' } }}>
@@ -292,7 +281,12 @@ export default function JourneyEditor({
           </Grid>
           <Grid item xs={12} sm={3}>
             <Controller name="destination" control={control} rules={{ required: 'Required' }} render={({ field }) => (
-              <StationAutocomplete value={field.value} onChange={field.onChange} label="To" error={errors.destination} />
+              <StationAutocomplete
+                value={field.value}
+                onChange={field.onChange}
+                label="To"
+                error={errors.destination}
+              />
             )} />
           </Grid>
           <Grid item xs={12} sm={5}>
@@ -319,38 +313,89 @@ export default function JourneyEditor({
             )} />
           </Grid>
 
-          <Grid item xs={12} sm={3}>
-            <Controller name="coach" control={control} render={({ field }) => (
-              <FormControl fullWidth>
-                <InputLabel>Class</InputLabel>
-                <Select {...field} label="Class">
-                  {CLASSES.map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}
-                </Select>
-              </FormControl>
-            )} />
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Controller name="quota" control={control} render={({ field }) => (
-              <FormControl fullWidth>
-                <InputLabel>Quota</InputLabel>
-                <Select {...field} label="Quota">
-                  {QUOTAS.map(option => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
-                </Select>
-              </FormControl>
-            )} />
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Controller name="availabilityRequirement" control={control} render={({ field }) => (
-              <FormControl fullWidth>
-                <InputLabel>Availability</InputLabel>
-                <Select {...field} label="Availability">
-                  <MenuItem value="AVAILABLE">Available</MenuItem>
-                  <MenuItem value="RAC">RAC</MenuItem>
-                  <MenuItem value="WL">Waitlist</MenuItem>
-                  <MenuItem value="ANY">Any</MenuItem>
-                </Select>
-              </FormControl>
-            )} />
+          <Grid item xs={12}>
+            <Accordion variant="outlined" disableGutters sx={{ mb: 1 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 1 } }}>
+                <Typography variant="body2" fontWeight="bold">Train Selection</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <TextField
+                      value={newTrainNumber}
+                      onChange={event => {
+                        setNewTrainNumber(event.target.value.replace(/\D/g, '').slice(0, 5))
+                        if (saveError) setSaveError('')
+                      }}
+                      label="Add Train Number"
+                      placeholder="5-digit train number"
+                      inputProps={{ maxLength: 5, inputMode: 'numeric' }}
+                      sx={{ flex: 1, minWidth: 220 }}
+                    />
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={addTrain} sx={{ minHeight: 40 }}>
+                      Add Train
+                    </Button>
+                  </Box>
+
+                  {trainFields.length === 0 && (
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        No explicit trains configured. Existing automatic journeys keep their previous selection behavior.
+                      </Typography>
+                    </Paper>
+                  )}
+
+                  {trainFields.map((field, index) => (
+                    <Paper key={field.id} variant="outlined" sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                      <Controller
+                        name={'selectedTrains.' + index + '.selected'}
+                        control={control}
+                        render={({ field: selectedField }) => (
+                          <Checkbox
+                            checked={selectedField.value !== false}
+                            onChange={event => toggleSelected(index, event.target.checked)}
+                            inputProps={{ 'aria-label': 'Select priority ' + (index + 1) }}
+                          />
+                        )}
+                      />
+                      <Box sx={{ minWidth: 72 }}>
+                        <Typography variant="caption" color="text.secondary">Priority</Typography>
+                        <Typography variant="body2" fontWeight="bold">{index + 1}</Typography>
+                      </Box>
+                      <Controller
+                        name={'selectedTrains.' + index + '.trainNumber'}
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            fullWidth
+                            label="Train Number"
+                            inputProps={{ maxLength: 5, inputMode: 'numeric' }}
+                            onChange={event => field.onChange(event.target.value.replace(/\D/g, '').slice(0, 5))}
+                          />
+                        )}
+                      />
+                      <IconButton size="small" onClick={() => moveTrain(index, index - 1)} disabled={index === 0} aria-label="Move train up">
+                        <ArrowUpwardIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => moveTrain(index, index + 1)} disabled={index === trainFields.length - 1} aria-label="Move train down">
+                        <ArrowDownwardIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => removeTrain(index)} aria-label="Remove train">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Paper>
+                  ))}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Only checked trains participate. {selectedCount === 1
+                    ? 'This train is mandatory.'
+                    : selectedCount > 1
+                      ? 'Trains will be tried in priority order. The first available selected train will be booked.'
+                      : 'Select at least one train.'}
+                </Typography>
+              </AccordionDetails>
+            </Accordion>
           </Grid>
           <Grid item xs={12} sm={3}>
             <Controller name="boardingStation" control={control} render={({ field }) => (
@@ -358,115 +403,6 @@ export default function JourneyEditor({
             )} />
           </Grid>
         </Grid>
-
-        <Accordion variant="outlined" disableGutters sx={{ mb: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 1 } }}>
-            <Typography variant="body2" fontWeight="bold">Train Selection</Typography>
-          </AccordionSummary>
-
-          <AccordionDetails sx={{ px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
-            <Stack spacing={1}>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <TextField
-                  value={newTrainNumber}
-                  onChange={event => {
-                    setNewTrainNumber(event.target.value.replace(/\D/g, '').slice(0, 5))
-                    if (saveError) setSaveError('')
-                  }}
-                  label="Add Train Number"
-                  placeholder="5-digit train number"
-                  inputProps={{ maxLength: 5, inputMode: 'numeric' }}
-                  sx={{ flex: 1, minWidth: 220 }}
-                />
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={addTrain}
-                  sx={{ minHeight: 40 }}
-                >
-                  Add Train
-                </Button>
-              </Box>
-
-              {trainFields.length === 0 && (
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    No explicit trains configured. An older automatic journey can continue using FIRST_VALID behavior.
-                  </Typography>
-                </Paper>
-              )}
-
-              {trainFields.map((field, index) => (
-                <Paper key={field.id} variant="outlined" sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                  <Controller
-                    name={'selectedTrains.' + index + '.selected'}
-                    control={control}
-                    render={({ field: selectedField }) => (
-                      <Checkbox
-                        {...selectedField}
-                        checked={selectedField.value !== false}
-                        onChange={event => toggleSelected(index, event.target.checked)}
-                        inputProps={{ 'aria-label': 'Select priority ' + (index + 1) }}
-                      />
-                    )}
-                  />
-
-                  <Box sx={{ minWidth: 80 }}>
-                    <Typography variant="caption" color="text.secondary">Priority</Typography>
-                    <Typography variant="body2" fontWeight="bold">{index + 1}</Typography>
-                  </Box>
-
-                  <Controller
-                    name={'selectedTrains.' + index + '.trainNumber'}
-                    control={control}
-                    render={({ field: trainField }) => (
-                      <TextField
-                        {...trainField}
-                        fullWidth
-                        label="Train Number"
-                        inputProps={{ maxLength: 5, inputMode: 'numeric' }}
-                        onChange={event => trainField.onChange(event.target.value.replace(/\D/g, '').slice(0, 5))}
-                      />
-                    )}
-                  />
-
-                  <IconButton
-                    size="small"
-                    onClick={() => moveTrain(index, index - 1)}
-                    disabled={index === 0}
-                    aria-label="Move train up"
-                  >
-                    <ArrowUpwardIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => moveTrain(index, index + 1)}
-                    disabled={index === trainFields.length - 1}
-                    aria-label="Move train down"
-                  >
-                    <ArrowDownwardIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => removeTrain(index)}
-                    aria-label="Remove train"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Paper>
-              ))}
-            </Stack>
-
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Only checked trains participate. {selectedCount === 1
-                ? 'This train is mandatory.'
-                : selectedCount > 1
-                  ? 'Trains will be tried in priority order. The first available selected train will be booked.'
-                  : 'Select at least one train for explicit train-selection mode.'}
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
 
         <Accordion variant="outlined" disableGutters sx={{ mb: 1 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 1 } }}>
@@ -484,7 +420,6 @@ export default function JourneyEditor({
                 />
               )}
             />
-
             <Stack spacing={1}>
               {passengers.map((passenger, index) => (
                 <Paper key={passenger.id} variant="outlined" sx={{ p: { xs: 1, sm: 1.25 }, minWidth: 0 }}>
@@ -494,9 +429,17 @@ export default function JourneyEditor({
                         name={'passengers.' + index + '.name'}
                         control={control}
                         rules={{ required: true }}
-                        render={({ field }) => <TextField {...field} label="Name" fullWidth error={!!errors.passengers?.[index]?.name} />}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            label="Name"
+                            fullWidth
+                            error={!!errors.passengers?.[index]?.name}
+                          />
+                        )}
                       />
                     </Grid>
+
                     <Grid item xs={4} sm={2}>
                       <Controller
                         name={'passengers.' + index + '.age'}
@@ -505,6 +448,7 @@ export default function JourneyEditor({
                         render={({ field }) => <TextField {...field} label="Age" type="number" fullWidth />}
                       />
                     </Grid>
+
                     <Grid item xs={8} sm={2}>
                       <Controller
                         name={'passengers.' + index + '.gender'}
@@ -521,6 +465,7 @@ export default function JourneyEditor({
                         )}
                       />
                     </Grid>
+
                     <Grid item xs={10} sm={2}>
                       <Controller
                         name={'passengers.' + index + '.berth'}
@@ -540,9 +485,10 @@ export default function JourneyEditor({
                         )}
                       />
                     </Grid>
+
                     <Grid item xs={2} sm={1} sx={{ display: 'flex', justifyContent: 'center' }}>
                       {passengers.length > 1 && (
-                        <IconButton size="small" color="error" onClick={() => removePassenger(index)} aria-label="Remove passenger">
+                        <IconButton size="small" color="error" onClick={() => remove(index)} aria-label="Remove passenger">
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       )}
@@ -554,7 +500,7 @@ export default function JourneyEditor({
 
             <Button
               startIcon={<AddIcon />}
-              onClick={() => appendPassenger({
+              onClick={() => append({
                 name: '',
                 age: '',
                 gender: 'Male',
@@ -601,7 +547,10 @@ export default function JourneyEditor({
                   <Controller
                     name="upiId"
                     control={control}
-                    rules={{ pattern: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.]+$/ }}
+                    rules={{
+                      required: 'UPI ID required',
+                      pattern: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.]+$/,
+                    }}
                     render={({ field }) => (
                       <TextField {...field} label="UPI ID" fullWidth error={!!errors.upiId} />
                     )}
@@ -620,12 +569,29 @@ export default function JourneyEditor({
                         label="IRCTC eWallet transaction password"
                         type="password"
                         fullWidth
-                        helperText="Stored in the active server session only; never saved in the journey or backup."
+                        helperText="Only needed when the current IRCTC payment flow asks for it. Stored in the active server session only."
                       />
                     )}
                   />
                 </Grid>
               )}
+
+              <Grid item xs={12} sm={6}>
+                <Controller
+                  name="executionMode"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl fullWidth>
+                      <InputLabel>Mode</InputLabel>
+                      <Select {...field} label="Mode">
+                        <MenuItem value="NOW">Run Now</MenuItem>
+                        <MenuItem value="SCHEDULED">Schedule for Later</MenuItem>
+                      </Select>
+                    </FormControl>
+                  )}
+                />
+              </Grid>
+            </Grid>
 
               <Grid item xs={12} sm={6}>
                 <Controller
@@ -650,7 +616,12 @@ export default function JourneyEditor({
           <FormHelperText error sx={{ mb: 1 }}>{saveError}</FormHelperText>
         )}
 
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'stretch', sm: 'flex-end' }, flexWrap: 'wrap' }}>
+        <Box sx={{
+          display: 'flex',
+          gap: 1,
+          justifyContent: { xs: 'stretch', sm: 'flex-end' },
+          flexWrap: 'wrap',
+        }}>
           <Button variant="outlined" onClick={onCancel} sx={{ flex: { xs: 1, sm: 'none' }, minWidth: 110 }}>
             Cancel
           </Button>

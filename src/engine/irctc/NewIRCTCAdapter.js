@@ -262,6 +262,10 @@ class NewIRCTCAdapter extends IRCTCAdapter {
     return this.validateBooking()
   }
 
+  async submitTransaction() {
+    return super.submitTransaction()
+  }
+
 }
 
 module.exports = { NewIRCTCAdapter }

@@ -77,9 +77,15 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accountName: accountUsername, transactionPassword }),
     })
+
     let data = {}
-    try { data = await response.json() } catch {}
-    if (!response.ok) throw new Error(data.error || 'Failed to store eWallet credential')
+    try {
+      data = await response.json()
+    } catch {}
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to store eWallet credential')
+    }
   }
 
   const handleJourneysSave = (nextJourneys) => {
@@ -245,7 +251,14 @@ export default function App() {
         )}
 
         {tab === 'journeys' && (
-          <JourneysTab journeys={journeys} onSave={handleJourneysSave} />
+          <JourneysTab
+            journeys={journeys}
+            onSave={handleJourneysSave}
+            accountUsername={
+              accounts.find(item => String(item.id) === String(selectedAccountId))?.username || ''
+            }
+            onSecurePaymentCredential={storeEwalletCredential}
+          />
         )}
 
         {tab === 'jobs' && <JobsTab />}

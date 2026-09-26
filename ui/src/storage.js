@@ -69,6 +69,7 @@ export function saveJobs(jobs) {
 
 export function buildJob(account, journey) {
   const method = String(journey.paymentPreference?.method || (journey.upiId ? 'UPI' : 'UPI')).toUpperCase()
+
   return {
     id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8),
     createdAt: new Date().toISOString(),
