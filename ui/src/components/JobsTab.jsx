@@ -4,7 +4,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
 import TrainOutlinedIcon from '@mui/icons-material/TrainOutlined'
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
-import { StatusBadge } from './RailxPrimitives'
+import { GlassPanel, StatusBadge } from './RailxPrimitives'
 
 const API = '/api'
 

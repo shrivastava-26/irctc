@@ -39,6 +39,7 @@ jobs:
           const book = fs.readFileSync('ui/src/components/BookTab.jsx', 'utf8')
           const editor = fs.readFileSync('ui/src/components/JourneyEditor.jsx', 'utf8')
           const dialog = fs.readFileSync('ui/src/components/AutomationDialog.jsx', 'utf8')
+          const jobs = fs.readFileSync('ui/src/components/JobsTab.jsx', 'utf8')
 
           const forbiddenWarning = 'This MVP stores usernames and passwords in browser local storage.'
           if (accounts.includes(forbiddenWarning)) throw new Error('Accounts security warning header still exists')
@@ -47,4 +48,5 @@ jobs:
           if ((editor.match(/replace\(\/\\D\/g, ''\)/g) || []).length === 0) throw new Error('Train number sanitization is missing')
           if (!dialog.includes('Promise.allSettled')) throw new Error('Automation polling regression: request fan-out is not guarded')
           if (!dialog.includes('setTimeout(poll, 1200)')) throw new Error('Automation polling regression: recursive timeout missing')
+          if (!jobs.includes("import { GlassPanel, StatusBadge } from './RailxPrimitives'")) throw new Error('Jobs tab GlassPanel import regression')
           NODE
