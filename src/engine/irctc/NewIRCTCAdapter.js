@@ -117,7 +117,7 @@ class NewIRCTCAdapter extends IRCTCAdapter {
     await this.detectRuntimeSurface()
   }
 
-  async inspectAvailability(candidate) {
+  async inspectAvailability(candidate, { readOnly = false } = {}) {
     const text = (await candidate.innerText()).replace(/\s+/g, ' ')
     const trainNumber = parseTrainNumber(text)
     if (!trainNumber) throw new Error('New IRCTC train card has no 5-digit train number.')
@@ -125,7 +125,7 @@ class NewIRCTCAdapter extends IRCTCAdapter {
     const nameMatch = text.match(/\b\d{5}\s+([A-Z][A-Z0-9 .&'-]+?)\s+(?:SL|3A|2A|1A)\b/i)
 
     const action = candidate.getByRole('button', { name: /check availability|refresh availability/i }).first()
-    if (await action.isVisible().catch(() => false)) {
+    if (!readOnly && await action.isVisible().catch(() => false)) {
       await action.click()
       await candidate.locator('div.class-card').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {})
     }
