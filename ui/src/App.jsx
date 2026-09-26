@@ -130,7 +130,7 @@ export default function App() {
         source: String(journey.source || '').toUpperCase(),
         destination: String(journey.destination || '').toUpperCase(),
         travelDate: journey.travelDate || '',
-        entrySurface: journey.entrySurface || 'NEW',
+        entrySurface: journey.entrySurface || 'AUTO',
         quota: journey.quota,
         trainNumber: journey.trainNumber || undefined,
         preferredTrains: Array.isArray(journey.preferredTrains) ? journey.preferredTrains : [],
