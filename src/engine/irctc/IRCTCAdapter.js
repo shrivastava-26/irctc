@@ -281,7 +281,11 @@ class IRCTCAdapter {
     // If that is required to obtain authoritative availability, fall back to the
     // existing sequential inspection path for this candidate only.
     if (readError || evaluation?.availability?.status === 'UNKNOWN') {
-      evaluation = await this.inspectAvailability(candidate)
+      try {
+        evaluation = await this.inspectAvailability(candidate)
+      } catch (error) {
+        return { trainNumber, candidate, evaluation, error }
+      }
       if (pickFirstSatisfied([evaluation], this.request.availabilityRequirement, availabilitySatisfies)) {
         return { trainNumber, candidate, evaluation }
       }
@@ -319,7 +323,7 @@ class IRCTCAdapter {
     if (!available.length) throw new Error('No train candidates found.')
     await this.verifyQuota()
 
-    const ordered = orderedTrainNumbers(this.request, available)
+    const ordered = [...new Set(orderedTrainNumbers(this.request, available).map(String))]
     const containers = this.trainContainers()
     const byTrain = new Map(available.map(item => [String(item.trainNumber), containers.nth(item.index)]))
     const probeLimit = this.availabilityProbeLimit()
