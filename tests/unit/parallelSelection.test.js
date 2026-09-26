@@ -18,6 +18,8 @@ class FakeAdapter extends IRCTCAdapter {
     this.candidates = Object.keys(statuses).map((trainNumber, index) => ({ trainNumber, index }))
     this.active = 0
     this.maxActive = 0
+    this.mutatingActive = 0
+    this.maxMutatingActive = 0
     this.readOnlyCalls = []
   }
 
@@ -32,9 +34,14 @@ class FakeAdapter extends IRCTCAdapter {
   async inspectAvailability(candidate, { readOnly = false } = {}) {
     this.readOnlyCalls.push({ trainNumber: candidate.trainNumber, readOnly })
     this.active += 1
+    if (!readOnly) {
+      this.mutatingActive += 1
+      this.maxMutatingActive = Math.max(this.maxMutatingActive, this.mutatingActive)
+    }
     this.maxActive = Math.max(this.maxActive, this.active)
     await delay(8)
     this.active -= 1
+    if (!readOnly) this.mutatingActive -= 1
     return {
       trainNumber: candidate.trainNumber,
       trainName: 'TEST',
@@ -79,4 +86,19 @@ test('an unknown higher-priority result is resolved before accepting a lower-pri
   assert.equal(selected.trainNumber, '22222')
   const fallback = adapter.readOnlyCalls.filter(call => call.trainNumber === '11111')
   assert.ok(fallback.some(call => call.readOnly === false))
+})
+test('mutating availability fallbacks never overlap on one page', async () => {
+  const adapter = new FakeAdapter({
+    credentialsReference: 'account',
+    source: 'SMVB',
+    destination: 'PNBE',
+    coach: 'SL',
+    quota: 'GENERAL',
+    trainSelectionPolicy: 'FIRST_VALID',
+    preferredTrains: ['11111', '22222'],
+    availabilityRequirement: 'AVAILABLE',
+  }, { '11111': 'UNKNOWN', '22222': 'UNKNOWN' })
+
+  await assert.rejects(() => adapter.selectTrain(), /No train satisfied deterministic selection/)
+  assert.equal(adapter.maxMutatingActive, 1)
 })
