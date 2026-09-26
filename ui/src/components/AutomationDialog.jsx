@@ -87,7 +87,7 @@ export default function AutomationDialog({ open, activeJobs, onClose, onAddJourn
 
   useEffect(() => {
     if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+      logsEndRef.current.scrollIntoView({ behavior: 'auto', block: 'nearest' })
     }
   }, [activeJob?.progressEvents?.length])
 
