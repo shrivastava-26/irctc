@@ -83,7 +83,7 @@ app.post('/jobs', (req, res) => {
     })
   }
 
-  const executionTarget = String(req.body?.executionTarget || 'API').toUpperCase()
+  const executionTarget = String(req.body?.executionTarget || 'LOCAL').toUpperCase()
   if (!['API', 'LOCAL'].includes(executionTarget)) {
     return res.status(409).json({ error: 'Unsupported execution target. Use API or LOCAL.', code: 'INVALID_EXECUTION_TARGET' })
   }

@@ -28,7 +28,7 @@ export default function App() {
   const [activeJobs, setActiveJobs] = useState([])
   const [showAutomationDialog, setShowAutomationDialog] = useState(false)
   const [selectedJourneyIds, setSelectedJourneyIds] = useState([])
-  const [railApiConfigured, setRailApiConfigured] = useState(false)
+  const [workerOnline, setWorkerOnline] = useState(false)
 
   useEffect(() => {
     const loadedAccounts = loadAccounts().map(account => ({
@@ -53,16 +53,17 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     let timer = null
-    const pollProvider = async () => {
+    const pollWorker = async () => {
       try {
-        const response = await fetch(API + '/provider/status', { cache: 'no-store' })
-        if (!cancelled) setRailApiConfigured(response.ok)
+        const response = await fetch(API + '/worker/status', { cache: 'no-store' })
+        const data = await response.json().catch(() => ({}))
+        if (!cancelled) setWorkerOnline(Boolean(response.ok && data.online))
       } catch {
-        if (!cancelled) setRailApiConfigured(false)
+        if (!cancelled) setWorkerOnline(false)
       }
-      if (!cancelled) timer = window.setTimeout(pollProvider, 15000)
+      if (!cancelled) timer = window.setTimeout(pollWorker, 5000)
     }
-    pollProvider()
+    pollWorker()
     return () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
@@ -125,7 +126,7 @@ export default function App() {
     for (const journey of journeysToAutomate) {
       const payload = {
         credentialsReference: account.username,
-        executionTarget: 'API',
+        executionTarget: 'LOCAL',
         source: String(journey.source || '').toUpperCase(),
         destination: String(journey.destination || '').toUpperCase(),
         travelDate: journey.travelDate || '',
@@ -200,7 +201,7 @@ export default function App() {
               selectedJourneyIds={selectedJourneyIds}
               onSelectionChange={setSelectedJourneyIds}
               activeJobsCount={activeJobs.length}
-              railApiConfigured={railApiConfigured}
+              workerOnline={workerOnline}
               onOpenDialog={() => setShowAutomationDialog(true)}
             />
           )}

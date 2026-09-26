@@ -18,7 +18,7 @@ export default function BookTab({
   selectedJourneyIds = [],
   onSelectionChange,
   onOpenDialog,
-  railApiConfigured = false,
+  workerOnline = false,
 }) {
   const selectedAcc = accounts.find(account => String(account.id) === String(selectedAccountId))
   const selectedSet = useMemo(() => new Set(selectedJourneyIds.map(String)), [selectedJourneyIds])
@@ -59,7 +59,7 @@ export default function BookTab({
 
         <Stack className="railx-context-status" direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
           <span className="railx-summary-pill">
-            Hosted rail API
+            User browser worker
           </span>
           <span className="railx-summary-pill">
             <QueuePlayNextOutlinedIcon sx={{ fontSize: 14 }} />
@@ -159,9 +159,9 @@ export default function BookTab({
                 ? '1 journey selected.'
                 : selectedCount + ' journeys selected.'}
           </Typography>
-          {!railApiConfigured && (
+          {!workerOnline && (
             <div className="railx-worker-notice" role="status">
-              <span>Hosted rail API is not configured. Add provider credentials on Render before automation.</span>
+              <span>Browser worker is offline. Start the RAILX worker on your authorized machine before automation.</span>
             </div>
           )}
         </div>
@@ -172,7 +172,7 @@ export default function BookTab({
           size="large"
           startIcon={<PlayArrowIcon />}
           onClick={() => onStart(selectedJourneyIds)}
-          disabled={!selectedAcc || selectedCount === 0 || !railApiConfigured}
+          disabled={!selectedAcc || selectedCount === 0 || !workerOnline}
           sx={{ minHeight: 46, minWidth: { xs: 0, sm: 220 } }}
         >
           Start automation

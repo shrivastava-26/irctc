@@ -4,7 +4,7 @@ const test = require('node:test')
 const { normalize, validate } = require('../../src/models/BookingRequest')
 const { constantTimeMatch } = require('../../src/security/WorkerAuth')
 
-test('booking requests accept API by default and explicit LOCAL execution target', () => {
+test('booking requests accept LOCAL by default and explicit API execution target', () => {
   const base = {
     credentialsReference: 'account',
     source: 'SMVB',
@@ -17,7 +17,8 @@ test('booking requests accept API by default and explicit LOCAL execution target
   assert.deepEqual(validate({ ...base, executionTarget: 'LOCAL' }), [])
   assert.equal(normalize({ ...base, executionTarget: 'LOCAL' }).executionTarget, 'LOCAL')
   assert.deepEqual(validate({ ...base, executionTarget: 'API' }), [])
-  assert.equal(normalize(base).executionTarget, 'API')
+  assert.equal(normalize({ ...base, executionTarget: 'API' }).executionTarget, 'API')
+  assert.equal(normalize(base).executionTarget, 'LOCAL')
   assert.match(
     validate({ ...base, executionTarget: 'HOSTED' }).join(' '),
     /executionTarget must be one of: API, LOCAL/,
