@@ -18,6 +18,7 @@ export default function BookTab({
   selectedJourneyIds = [],
   onSelectionChange,
   onOpenDialog,
+  localWorkerOnline = false,
 }) {
   const selectedAcc = accounts.find(account => String(account.id) === String(selectedAccountId))
   const selectedSet = useMemo(() => new Set(selectedJourneyIds.map(String)), [selectedJourneyIds])
@@ -44,19 +45,19 @@ export default function BookTab({
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <div className="railx-context-bar">
-        <Stack direction="row" spacing={1} alignItems="center" minWidth={0}>
+        <Stack className="railx-context-account" direction="row" spacing={1} alignItems="center" minWidth={0}>
           <Box className="railx-brand-mark" sx={{ width: 36, height: 36, flexShrink: 0 }}>
             <ManageAccountsOutlinedIcon fontSize="small" />
           </Box>
-          <Box minWidth={0}>
+          <Box className="railx-account-identity" minWidth={0}>
             <Typography className="railx-kicker">Active account</Typography>
-            <Typography variant="body2" sx={{ mt: 0.15, fontWeight: 800, overflowWrap: 'anywhere' }}>
+            <Typography className="railx-context-name" variant="body2" sx={{ mt: 0.15, fontWeight: 800 }}>
               {selectedAcc ? selectedAcc.label + ' · ' + selectedAcc.username : 'No account selected'}
             </Typography>
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
+        <Stack className="railx-context-status" direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
           <span className="railx-summary-pill">
             <LaptopMacOutlinedIcon sx={{ fontSize: 14 }} />
             Local browser
@@ -76,7 +77,7 @@ export default function BookTab({
             <Typography component="h1" className="railx-section-title">Ready to run</Typography>
           </Box>
 
-          <Stack direction="row" spacing={0.2} flexWrap="wrap" justifyContent="flex-end">
+          <Stack className="railx-section-actions" direction="row" spacing={0.2} flexWrap="wrap" justifyContent="flex-end">
             <Button variant="text" size="small" onClick={selectAll} disabled={!journeys.length}>Select all</Button>
             <Button variant="text" size="small" onClick={clearAll} disabled={!selectedCount}>Clear</Button>
             {activeJobsCount > 0 && <Button variant="outlined" size="small" onClick={onOpenDialog}>Running {activeJobsCount}</Button>}
@@ -159,6 +160,12 @@ export default function BookTab({
                 ? '1 journey selected.'
                 : selectedCount + ' journeys selected.'}
           </Typography>
+          {!localWorkerOnline && (
+            <div className="railx-worker-notice" role="status">
+              <LaptopMacOutlinedIcon sx={{ fontSize: 16 }} />
+              <span>Local browser worker is offline. Start it before automation.</span>
+            </div>
+          )}
         </div>
 
         <NeoButton
@@ -167,7 +174,7 @@ export default function BookTab({
           size="large"
           startIcon={<PlayArrowIcon />}
           onClick={() => onStart(selectedJourneyIds)}
-          disabled={!selectedAcc || selectedCount === 0}
+          disabled={!selectedAcc || selectedCount === 0 || !localWorkerOnline}
           sx={{ minHeight: 46, minWidth: { xs: 0, sm: 220 } }}
         >
           Start automation
