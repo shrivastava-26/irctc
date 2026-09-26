@@ -98,7 +98,8 @@ export default function StationAutocomplete({
       onOpen={() => loadStations().catch(() => {})}
       onInputChange={(_, nextValue, reason) => {
         setInputValue(nextValue)
-        if (reason === 'clear') onChange('')
+        const selectedLabel = selected ? selected.name + ' (' + selected.code + ')' : ''
+        if (reason === 'clear' || (reason === 'input' && nextValue !== selectedLabel)) onChange('')
       }}
       onChange={(_, nextOption) => {
         onChange(nextOption ? String(nextOption.code).toUpperCase() : '')
