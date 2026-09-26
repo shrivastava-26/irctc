@@ -5,6 +5,7 @@ const { shouldRetry, backoffMs } = require('../../src/engine/RetryPolicy')
 const BookingRequest = require('../../src/models/BookingRequest')
 const { orderedTrainNumbers, pickFirstSatisfied } = require('../../src/engine/irctc/selection')
 const { normalizeSurface, detectRuntimeSurfaceFromUrl, parseTravelDate, normalizeAvailability, availabilitySatisfies, parsePnr } = require('../../src/engine/irctc/utils')
+const { normalizeBrowser, resolveBrowserCandidates, browserConfig } = require('../../src/engine/irctc/sessionManager')
 
 test('credential registration preserves the eWallet secret in the server session', async () => {
   const {
@@ -25,6 +26,20 @@ test('credential registration preserves the eWallet secret in the server session
 test('production IRCTC adapters load without syntax errors', () => {
   assert.ok(require('../../src/engine/irctc/NewIRCTCAdapter'))
   assert.ok(require('../../src/engine/irctc/LegacyIRCTCAdapter'))
+})
+
+
+test('Playwright browser policy prefers deterministic Chromium and supports branded fallback', () => {
+  assert.equal(normalizeBrowser(undefined), 'chromium')
+  assert.equal(normalizeBrowser('msedge'), 'edge')
+  assert.equal(normalizeBrowser('auto'), 'auto')
+  assert.deepEqual(resolveBrowserCandidates('chromium'), ['chromium'])
+  assert.deepEqual(resolveBrowserCandidates('chrome'), ['chrome', 'chromium'])
+  assert.deepEqual(resolveBrowserCandidates('edge'), ['edge', 'chromium'])
+  assert.deepEqual(resolveBrowserCandidates('auto'), ['chrome', 'edge', 'chromium'])
+  assert.deepEqual(browserConfig('chrome'), { channel: 'chrome' })
+  assert.deepEqual(browserConfig('edge'), { channel: 'msedge' })
+  assert.deepEqual(browserConfig('chromium'), {})
 })
 
 test('surface model supports Auto, New, Legacy and runtime handoff', () => {
