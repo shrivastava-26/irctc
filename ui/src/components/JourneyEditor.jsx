@@ -30,6 +30,7 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
         travelDate: initialData.travelDate
           ? dayjs(initialData.travelDate, 'DD/MM/YYYY')
           : null,
+        manualTrainNumber: initialData.trainNumber || '',
       })
     : {
         source: '',
@@ -90,7 +91,6 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
       preferredTrains: csv(data.preferredTrains),
       backupTrains: csv(data.backupTrains),
       id: initialData && initialData.id ? initialData.id : Date.now().toString(),
-      manualTrainNumber: undefined,
     }))
   }
 
@@ -145,7 +145,14 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
             <Controller name="trainSelectionPolicy" control={control} render={({ field }) => (
               <FormControl fullWidth>
                 <InputLabel>Train Selection</InputLabel>
-                <Select {...field} label="Train Selection">
+                <Select
+                  {...field}
+                  label="Train Selection"
+                  onChange={(event) => {
+                    field.onChange(event)
+                    if (event.target.value === 'FIRST_VALID') setValue('trainNumber', '')
+                  }}
+                >
                   <MenuItem value="FIXED">Fixed Train</MenuItem>
                   <MenuItem value="FIRST_VALID">First Valid</MenuItem>
                 </Select>
@@ -179,10 +186,8 @@ export default function JourneyEditor({ initialData, onSave, onCancel }) {
                 onChange={(event) => {
                   const value = event.target.value.replace(/\\D/g, '').slice(0, 5)
                   field.onChange(value)
-                  if (value.length === 5) {
-                    setValue('trainNumber', value)
-                    setValue('trainSelectionPolicy', 'FIXED')
-                  }
+                  setValue('trainNumber', value)
+                  setValue('trainSelectionPolicy', value ? 'FIXED' : 'FIRST_VALID')
                 }}
                 helperText="Fallback when train search is unavailable"
               />
