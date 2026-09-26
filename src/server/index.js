@@ -12,6 +12,8 @@ const { authorizeWorker, configuredToken } = require('../security/WorkerAuth')
 
 const app = express()
 const PORT = process.env.PORT || 3001
+const workerPresence = new Map()
+const WORKER_PRESENCE_TTL_MS = Math.max(30000, Number(process.env.SIVA_WORKER_PRESENCE_TTL_MS) || 45000)
 
 app.use(cors())
 app.use(express.json({ limit: '1mb' }))
@@ -128,6 +130,24 @@ app.post('/jobs/:id/events', (req, res) => {
 
 // Local execution worker API.
 // Credentials are never accepted by these endpoints; the worker resolves them locally.
+app.post('/worker/heartbeat', (req, res) => {
+  if (!workerAuth(req, res)) return
+
+  const { workerId, accountReference = null, concurrency = 1, activeJobs = 0 } = req.body || {}
+  if (!workerId) return res.status(400).json({ error: 'workerId is required' })
+
+  const now = Date.now()
+  workerPresence.set(String(workerId), {
+    workerId: String(workerId),
+    accountReference: accountReference ? String(accountReference) : null,
+    concurrency: Number(concurrency) || 1,
+    activeJobs: Number(activeJobs) || 0,
+    lastSeenAt: new Date(now).toISOString(),
+  })
+
+  res.json({ ok: true, serverTime: new Date(now).toISOString() })
+})
+
 app.post('/worker/claim', (req, res) => {
   if (!workerAuth(req, res)) return
 
@@ -202,9 +222,16 @@ app.post('/worker/jobs/:id/complete', (req, res) => {
 })
 
 app.get('/worker/status', (req, res) => {
+  const now = Date.now()
+  const workers = Array.from(workerPresence.values())
+    .filter(worker => now - new Date(worker.lastSeenAt).getTime() <= WORKER_PRESENCE_TTL_MS)
+    .map(worker => ({ ...worker, online: true }))
+
   res.json({
     configured: Boolean(configuredToken()),
-    timestamp: new Date().toISOString(),
+    online: workers.length > 0,
+    workers,
+    timestamp: new Date(now).toISOString(),
   })
 })
 
