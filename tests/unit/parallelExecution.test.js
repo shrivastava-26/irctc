@@ -60,3 +60,6 @@ test('worker pool can run different accounts concurrently while serializing one 
   releaseA2()
   assert.equal(pool.stats().concurrency.active, 0)
 })
+test('scheduler can load the worker pool integration', () => {
+  assert.doesNotThrow(() => require('../../src/scheduler/Scheduler'))
+})
