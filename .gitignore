@@ -83,3 +83,6 @@ update_mock_js.py
 # Autonomous runtime and personal booking request
 .data/
 booking-request.json
+
+# Local worker secrets
+.env.local-worker
