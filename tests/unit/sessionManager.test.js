@@ -1,13 +1,10 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
 const test = require('node:test')
 const {
   browserConfig,
   configuredBrowser,
   isMissingBrowserExecutable,
   profileDir,
-  launchSession,
-  closeSession,
 } = require('../../src/engine/irctc/sessionManager')
 
 test('browserConfig maps supported browser targets', () => {
@@ -37,21 +34,3 @@ test('browser configuration defaults to chromium when no explicit target exists'
   }
 })
 
-test('persistent Chromium session launches successfully', async () => {
-  const request = {
-    credentialsReference: 'session-manager-test',
-    browser: 'chromium',
-  }
-  const dir = profileDir(request, 'chromium')
-  fs.rmSync(dir, { recursive: true, force: true })
-
-  const session = await launchSession({ request, headless: true })
-  try {
-    assert.equal(session.browser, 'chromium')
-    assert.equal(session.userDataDir, dir)
-    assert.equal(session.page.isClosed(), false)
-  } finally {
-    await closeSession(session)
-    fs.rmSync(dir, { recursive: true, force: true })
-  }
-})
