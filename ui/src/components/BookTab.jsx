@@ -74,6 +74,13 @@ export default function BookTab({
 
           <Stack direction="row" spacing={0.8} flexWrap="wrap" justifyContent="flex-end">
             <Chip
+              label="LOCAL BROWSER"
+              size="small"
+              color="success"
+              variant="outlined"
+              sx={{ fontWeight: 850 }}
+            />
+            <Chip
               icon={<QueuePlayNextOutlinedIcon />}
               label={activeJobsCount + ' active job' + (activeJobsCount === 1 ? '' : 's')}
               size="small"
