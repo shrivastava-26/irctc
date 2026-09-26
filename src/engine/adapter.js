@@ -125,6 +125,14 @@ function runCypress(job, credentials, onEvent) {
       ...process.env,
       CYPRESS_USERNAME: credentials.username,
       CYPRESS_PASSWORD: credentials.password,
+      CYPRESS_IRCTC_USERNAME: credentials.username,
+      CYPRESS_IRCTC_PASSWORD: credentials.password,
+      CYPRESS_BOOKING_REQUEST: JSON.stringify(req),
+      CYPRESS_JOB_ID: job.id,
+      CYPRESS_FAST_MODE:
+        req.fastMode === false ? 'false' : String(process.env.FAST_MODE || 'true'),
+      CYPRESS_DEBUG_MODE:
+        req.debugMode === true ? 'true' : String(process.env.DEBUG_MODE || 'false'),
     }
 
     const browser = env.CYPRESS_BROWSER || req.browser || 'edge'
@@ -132,31 +140,6 @@ function runCypress(job, credentials, onEvent) {
       env.CYPRESS_HEADED == null
         ? true
         : String(env.CYPRESS_HEADED).toLowerCase() === 'true'
-
-    const legacyConfig = {
-      TRAIN_NO: req.trainNumber,
-      TRAIN_COACH: req.coach,
-      TRAVEL_DATE: req.travelDate,
-      SOURCE_STATION: req.source,
-      DESTINATION_STATION: req.destination,
-      BOARDING_STATION: req.boardingStation || null,
-      TATKAL: req.quota === 'TATKAL',
-      PREMIUM_TATKAL: req.quota === 'PREMIUM_TATKAL',
-      UPI_ID_CONFIG:
-        (req.paymentPreference && req.paymentPreference.upiId) || '',
-      PASSENGER_DETAILS: (req.passengers || []).map((p) => ({
-        NAME: p.name,
-        AGE: p.age,
-        GENDER: p.gender,
-        SEAT: p.berth || 'No Preference',
-        FOOD: p.food || 'No Food',
-      })),
-    }
-
-    fs.writeFileSync(
-      path.join(cwd, 'cypress', 'fixtures', 'passenger_data.json'),
-      JSON.stringify(legacyConfig, null, 2),
-    )
 
     ensureCypressBinary(cwd, env, onEvent)
       .then(() => {
@@ -166,13 +149,12 @@ function runCypress(job, credentials, onEvent) {
           '--browser',
           browser,
           '--spec',
-          'cypress/e2e/irctc.cy.js',
+          'cypress/e2e/autonomous-booking.cy.js',
         ]
 
-        if (headed) {
-          args.splice(2, 0, '--headed')
-        }
+        if (headed) args.splice(2, 0, '--headed')
 
+        const startedAt = Date.now()
         const child = spawn('npx', args, {
           cwd,
           env,
@@ -183,15 +165,15 @@ function runCypress(job, credentials, onEvent) {
         let stderr = ''
 
         child.stdout.on('data', (data) => {
-          const text = data.toString()
-          stdout += text
+          const chunk = data.toString()
+          stdout += chunk
 
-          const cleanText = text.replace(
+          const clean = chunk.replace(
             /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
             '',
           )
 
-          cleanText
+          clean
             .split('\n')
             .filter(Boolean)
             .forEach((line) => {
@@ -208,33 +190,50 @@ function runCypress(job, credentials, onEvent) {
         })
 
         child.on('close', (code) => {
-          const combinedOutput = stdout + '\n' + stderr
-          const pnrMatch = combinedOutput.match(/PNR[:\s]+([A-Z0-9]{10})/i)
-          const pnr = pnrMatch ? pnrMatch[1] : null
-          const success = code === 0
-
+          let persisted = null
           try {
-            copyArtifacts(job.id, cwd)
+            persisted = require('./RunStateStore').load(job.id)
           } catch {
-            // Artifacts are best-effort.
+            // Best-effort state read after Cypress exits.
           }
 
-          const cleanStderr = stderr
-            ? stderr.replace(
-                /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
-                '',
-              )
-            : ''
+          const combinedOutput = stdout + '\n' + stderr
+          const pnrMatch = combinedOutput.match(
+            /PNR\s*(?:NO|NUMBER)?\s*[:#-]?\s*(\d{10})/i,
+          )
+          const pnr =
+            persisted?.metadata?.pnr ||
+            persisted?.metadata?.result?.pnr ||
+            (pnrMatch ? pnrMatch[1] : null)
+
+          const success =
+            code === 0 &&
+            (Boolean(pnr) || persisted?.state === 'SUCCESS')
 
           const result = {
             jobId: job.id,
             success,
             exitCode: code,
-            pnr,
+            pnr: pnr || null,
+            state: persisted?.state || job.currentState,
+            elapsedMs: Date.now() - startedAt,
+            telemetry: (() => {
+              try {
+                return require('./Telemetry').snapshot(job.id)
+              } catch {
+                return null
+              }
+            })(),
             error: success
               ? null
-              : cleanStderr.trim() || 'Cypress test run failed',
+              : (persisted?.message ||
+                stderr.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '').trim() ||
+                'Cypress automation did not reach a verified success state'),
           }
+
+          try {
+            copyArtifacts(job.id, cwd)
+          } catch {}
 
           writeResult(job.id, result)
           resolve(result)
@@ -246,6 +245,7 @@ function runCypress(job, credentials, onEvent) {
             success: false,
             exitCode: -1,
             pnr: null,
+            state: job.currentState,
             error: err.message,
           })
         })
@@ -256,6 +256,7 @@ function runCypress(job, credentials, onEvent) {
           success: false,
           exitCode: -1,
           pnr: null,
+          state: job.currentState,
           error: err.message,
         })
       })
